@@ -9,7 +9,7 @@
 # On Windows: use GitHub Actions (see .github/workflows/sync.yml) or WSL2.
 
 spotipy>=2.23.0
-essentia-tensorflow>=2.1b6
+essentia-tensorflow  # only dev wheels exist; no version pin
 spotdl>=4.2.0
 numpy>=1.24.0
 tqdm>=4.0.0
