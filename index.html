@@ -76,9 +76,13 @@
   <script defer src="js/player.js"></script>
   <script defer src="js/ui.js"></script>
 
-  <!-- Inline app bootstrap — runs after all deferred scripts have loaded -->
-  <script defer>
-    (async () => {
+  <!-- Inline app bootstrap.
+       DOMContentLoaded fires after all deferred external scripts have executed,
+       so Auth, UI, Player etc. are guaranteed to be defined by then.
+       Note: `defer` is silently ignored on inline scripts by all browsers —
+       DOMContentLoaded is the correct way to wait for deferred scripts. -->
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
       // ---- 1. Auth ----
       // May redirect to Spotify login and return via the PKCE callback.
       // If redirecting, execution stops here for this page load.
@@ -177,7 +181,7 @@
 
       // Wait for SDK ready → get device_id → transfer playback to this browser.
       deviceId = await Player.waitForReady();
-    })();
+    });
   </script>
 
   <!-- Spotify Web Playback SDK — async so page rendering is not blocked.
