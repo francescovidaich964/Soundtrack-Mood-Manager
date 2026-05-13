@@ -42,6 +42,8 @@ def get_preview_url(track_id: str) -> str | None:
     try:
         data = json.loads(match.group(1))
         entity = data["props"]["pageProps"]["state"]["data"]["entity"]
+        if entity is None:
+            return None
         return entity.get("audioPreview", {}).get("url")
     except (KeyError, json.JSONDecodeError):
         return None
@@ -63,7 +65,7 @@ def download(track_id: str, title: str, artist: str, temp_base: Path) -> Path | 
     track_dir.mkdir(parents=True, exist_ok=True)
 
     preview_url = get_preview_url(track_id)
-    if not preview_url:
+    if not preview_url or preview_url is None:
         return None
 
     out_path = track_dir / "preview.mp3"
