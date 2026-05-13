@@ -20,8 +20,49 @@ jobs:
       contents: write  # needed by peaceiris/actions-gh-pages to push gh-pages branch
 
     steps:
-      - name: Checkout main
+      - name: Checkout source
         uses: actions/checkout@v4
+
+      # ------------------------------------------------------------------
+      # Determine deploy target (main → root, other branches → /preview/)
+      # ------------------------------------------------------------------
+      - name: Determine deploy target
+        id: target
+        run: |
+          BASE="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
+          if [ "${{ github.ref_name }}" = "main" ]; then
+            echo "dest="                  >> "$GITHUB_OUTPUT"
+            echo "pages_url=${BASE}/"     >> "$GITHUB_OUTPUT"
+            echo "preview=false"          >> "$GITHUB_OUTPUT"
+          else
+            echo "dest=preview"                >> "$GITHUB_OUTPUT"
+            echo "pages_url=${BASE}/preview/"  >> "$GITHUB_OUTPUT"
+            echo "preview=true"                >> "$GITHUB_OUTPUT"
+          fi
+
+      # ------------------------------------------------------------------
+      # Restore data.js cache from gh-pages so already-analyzed tracks
+      # are skipped (fixes a bug where this was previously missing).
+      # ------------------------------------------------------------------
+      - name: Restore data.js cache from gh-pages
+        run: |
+          git fetch origin gh-pages 2>/dev/null || true
+
+          if [ "${{ steps.target.outputs.preview }}" = "true" ]; then
+            if git show origin/gh-pages:preview/data.js > webapp/data.js 2>/dev/null; then
+              echo "Restored data.js from preview"
+            elif git show origin/gh-pages:data.js > webapp/data.js 2>/dev/null; then
+              echo "Restored data.js from main (fallback)"
+            else
+              echo "No data.js found — first sync"
+            fi
+          else
+            if git show origin/gh-pages:data.js > webapp/data.js 2>/dev/null; then
+              echo "Restored data.js from main"
+            else
+              echo "No data.js found — first sync"
+            fi
+          fi
 
       # ------------------------------------------------------------------
       # Cache Essentia .pb models so we don't re-download them every run.
@@ -82,7 +123,7 @@ jobs:
           SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
           SPOTIFY_PLAYLIST_ID: ${{ inputs.playlist || secrets.SPOTIFY_PLAYLIST_ID }}
           SPOTIFY_REFRESH_TOKEN: ${{ secrets.SPOTIFY_REFRESH_TOKEN }}
-          GITHUB_PAGES_URL: "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"
+          GITHUB_PAGES_URL: ${{ steps.target.outputs.pages_url }}
         run: |
           EXTRA_FLAGS=""
           if [ "${{ inputs.force_reanalyze }}" = "true" ]; then
@@ -92,13 +133,12 @@ jobs:
 
       # ------------------------------------------------------------------
       # Deploy webapp/ (with generated data.js + config.js) to gh-pages.
-      # main branch is never touched.
       # ------------------------------------------------------------------
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./webapp
-          commit_message: "chore: sync playlist [skip ci]"
-          # Keep previous files in gh-pages (don't wipe on every deploy).
-          keep_files: false
+          destination_dir: ${{ steps.target.outputs.dest }}
+          keep_files: true
+          commit_message: "chore: sync playlist from ${{ github.ref_name }} [skip ci]"

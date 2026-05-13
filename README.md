@@ -5,10 +5,10 @@ A mood-driven music player for Dungeons & Dragons sessions. Drag a point on a 2D
 ```
 sad / calm        →        happy / calm
         ┌─────────────────────┐
-        │  · ·   ·     ·  ·  │  ← each dot is a track
-        │     ·     ·        │
-        │  ·    ○ ← cursor   │
-        │     ·      ·    ·  │
+        │  · ·   ·     ·  ·   │  ← each dot is a track
+        │     ·     ·         │
+        │  ·    ○ ← cursor    │
+        │     ·      ·    ·   │
         └─────────────────────┘
 sad / energetic   →   happy / energetic
 ```
@@ -17,7 +17,7 @@ sad / energetic   →   happy / energetic
 
 ## How it works
 
-- **Phase 1 — Sync** (GitHub Actions, Linux): fetches your Spotify playlist, downloads each track with [spotdl](https://github.com/spotDL/spotify-downloader), analyzes it with [Essentia](https://essentia.upf.edu/) TensorFlow models, and writes `webapp/data.js`.
+- **Phase 1 — Sync** (GitHub Actions, Linux): fetches your Spotify playlist, downloads 30-second preview clips from Spotify's embed pages, analyzes them with [Essentia](https://essentia.upf.edu/) TensorFlow models, and writes `webapp/data.js`.
 - **Phase 2 — Session** (your browser): reads `data.js`, authenticates via Spotify PKCE, plays music through the Spotify Web Playback SDK — no local server needed.
 
 > **Spotify Premium required** — the Web Playback SDK only works with Premium accounts.
@@ -44,8 +44,9 @@ cd Soundtrack-Mood-Manager
 1. Go to [developer.spotify.com/dashboard](https://developer.spotify.com/dashboard) and click **Create app**.
 2. Fill in any name and description.
 3. Under **APIs used**, enable **Web API** and **Web Playback SDK**.
-4. Add two **Redirect URIs** (Settings → Edit):
-   - `https://<you>.github.io/Soundtrack-Mood-Manager/` ← for the live webapp
+4. Add three **Redirect URIs** (Settings → Edit):
+   - `https://<you>.github.io/Soundtrack-Mood-Manager/` ← production webapp
+   - `https://<you>.github.io/Soundtrack-Mood-Manager/preview/` ← preview deployments (feature branches)
    - `https://<you>.github.io/Soundtrack-Mood-Manager/token.html` ← for the one-time token setup script
 5. Save. Note your **Client ID** and **Client Secret** from the app overview page.
 
@@ -56,7 +57,10 @@ cd Soundtrack-Mood-Manager
 Spotify's API requires a user login token even for public playlists (post-2024 policy).
 This step generates a long-lived refresh token that GitHub Actions will use automatically from then on.
 
-**First, push this repo to GitHub** so that `webapp/token.html` is deployed to GitHub Pages (the deploy workflow runs automatically on every push — wait ~30 seconds for it to finish).
+**First, make sure `webapp/token.html` is deployed to GitHub Pages:**
+1. If you forked this repo, go to the **Actions** tab and enable workflows (GitHub disables them by default on forks).
+2. Trigger the deploy: go to **Actions → Deploy Webapp → Run workflow → Run workflow**. This publishes the webapp to GitHub Pages.
+3. Wait ~30 seconds for the deploy to finish.
 
 Then, on any machine (Windows / macOS / Linux) — no extra installs needed:
 
@@ -122,7 +126,7 @@ Go to **Actions → Sync Playlist → Run workflow → Run workflow**.
 The workflow will:
 1. Download the Essentia `.pb` model files (~3 MB + ~80 KB, cached after the first run).
 2. Install Python dependencies.
-3. Download each playlist track with spotdl and analyze it with Essentia.
+3. Download each track's 30-second preview clip and analyze it with Essentia.
 4. Write `webapp/data.js` and `webapp/js/config.js`.
 5. Deploy `webapp/` to the `gh-pages` branch → GitHub Pages updates automatically.
 
@@ -147,6 +151,19 @@ With a 50-track playlist, the first run takes **~25–30 minutes**. Subsequent r
 Trigger **Actions → Sync Playlist → Run workflow** again. Only new tracks are downloaded and analyzed; existing ones are skipped.
 
 To force re-analysis of every track (e.g. after switching playlists), check **force_reanalyze** in the workflow inputs.
+
+---
+
+## Feature branch workflow
+
+You can develop and test on feature branches without touching production.
+
+- **Webapp changes**: push to any non-main branch → the deploy workflow auto-deploys to `/preview/` on GitHub Pages.
+- **Sync changes**: go to Actions → Sync Playlist → Run workflow → pick your feature branch from the branch dropdown.
+- **Test** at `https://<you>.github.io/Soundtrack-Mood-Manager/preview/`.
+- When ready, open a PR to `main` and squash-merge. Production at `/` updates automatically.
+
+The preview slot is shared — the last push to any non-main branch wins. Each slot has its own `data.js`, but the first preview deploy falls back to main's data so UI changes are immediately testable.
 
 ---
 
@@ -180,7 +197,7 @@ python sync.py --local
 |---|---|
 | Sync fails with 401 | `SPOTIFY_REFRESH_TOKEN` secret is missing or expired. Re-run `get_refresh_token.py` and update the secret. |
 | "Spotify Premium required" | The Web Playback SDK requires a Premium account. |
-| OAuth redirect fails after login | Check that both Redirect URIs in your Spotify app are added exactly as shown in Step 2, including the trailing `/`. |
-| Tracks missing from the canvas | Check the Actions log — tracks with `download_failed` or `analysis_failed` were skipped by spotdl or Essentia. |
-| Blank canvas after login | Open browser DevTools → Console for errors. Usually a mismatched `redirectUri` in `config.js` — re-run the Sync workflow. |
+| OAuth redirect fails after login | Check that all three Redirect URIs in your Spotify app are added exactly as shown in Step 2, including the trailing `/`. |
+| Tracks missing from the canvas | Check the Actions log — tracks with `download_failed` (no preview available) or `analysis_failed` were skipped. |
+| Blank canvas after login | Open browser DevTools → Console for errors. If `data.js` is missing, run the Sync workflow. |
 | `gh-pages` branch not found | Run the Sync workflow at least once. It creates the branch on first deploy. |
