@@ -68,7 +68,7 @@ def download(track_id: str, title: str, artist: str, temp_base: Path) -> Path | 
     track_dir.mkdir(parents=True, exist_ok=True)
 
     preview_url = get_preview_url(track_id)
-    if not preview_url or preview_url is None:
+    if not preview_url:
         return None
 
     out_path = track_dir / "preview.mp3"
