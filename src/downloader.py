@@ -44,7 +44,10 @@ def get_preview_url(track_id: str) -> str | None:
         entity = data["props"]["pageProps"]["state"]["data"]["entity"]
         if entity is None:
             return None
-        return entity.get("audioPreview", {}).get("url")
+        audio_preview = entity.get("audioPreview", {})
+        if audio_preview is None:
+            return None
+        return audio_preview.get("url")
     except (KeyError, json.JSONDecodeError):
         return None
 
