@@ -1,15 +1,16 @@
 name: Deploy Webapp
 
-# Triggers on every push to main so that changes to webapp source files
-# (index.html, js/, css/) are reflected on GitHub Pages immediately,
-# without needing to re-run the full Essentia sync.
+# Deploys webapp source files to GitHub Pages on every push.
+#   - main branch  → root (/)         — production
+#   - other branches → /preview/       — staging slot
 #
-# Generated files (data.js, config.js) are preserved from the current
-# gh-pages branch so playlist data is never lost.
+# Generated files (data.js, config.js) are restored from gh-pages
+# so playlist data is never lost.
 
 on:
   push:
-    branches: [main]
+    branches: ['**']
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -18,21 +19,85 @@ jobs:
       contents: write
 
     steps:
-      - name: Checkout main
+      - name: Checkout source
         uses: actions/checkout@v4
+
+      - name: Determine deploy target
+        id: target
+        run: |
+          if [ "${{ github.ref_name }}" = "main" ]; then
+            echo "dest="          >> "$GITHUB_OUTPUT"
+            echo "preview=false"  >> "$GITHUB_OUTPUT"
+          else
+            echo "dest=preview"   >> "$GITHUB_OUTPUT"
+            echo "preview=true"   >> "$GITHUB_OUTPUT"
+          fi
 
       # Restore generated files from gh-pages (if they exist).
       # Falls back silently on the very first deploy (no gh-pages yet).
       - name: Restore generated files from gh-pages
         run: |
           git fetch origin gh-pages 2>/dev/null || true
-          git show origin/gh-pages:data.js          > webapp/data.js       2>/dev/null || true
-          git show origin/gh-pages:js/config.js   > webapp/js/config.js  2>/dev/null || true
+
+          if [ "${{ steps.target.outputs.preview }}" = "true" ]; then
+            # Preview: try preview copy first, fall back to main's copy
+            if git show origin/gh-pages:preview/data.js > webapp/data.js 2>/dev/null; then
+              echo "Restored data.js from preview"
+            elif git show origin/gh-pages:data.js > webapp/data.js 2>/dev/null; then
+              echo "Restored data.js from main (fallback)"
+            else
+              echo "No data.js found — first deploy"
+            fi
+
+            if git show origin/gh-pages:preview/js/config.js > webapp/js/config.js 2>/dev/null; then
+              echo "Restored config.js from preview"
+            elif git show origin/gh-pages:js/config.js > webapp/js/config.js 2>/dev/null; then
+              echo "Restored config.js from main (fallback)"
+            else
+              echo "No config.js found — first deploy"
+            fi
+          else
+            # Main: restore from root
+            if git show origin/gh-pages:data.js > webapp/data.js 2>/dev/null; then
+              echo "Restored data.js from main"
+            else
+              echo "No data.js found — first deploy"
+            fi
+
+            if git show origin/gh-pages:js/config.js > webapp/js/config.js 2>/dev/null; then
+              echo "Restored config.js from main"
+            else
+              echo "No config.js found — first deploy"
+            fi
+          fi
+
+      # For main deploys: save the preview directory before deploying,
+      # since keep_files: false would wipe it.
+      - name: Save preview directory
+        if: steps.target.outputs.preview == 'false'
+        run: |
+          git fetch origin gh-pages 2>/dev/null || true
+          mkdir -p /tmp/preview-backup
+          cd /tmp/preview-backup
+          # Extract preview/ from gh-pages into a temp dir
+          if git -C "$GITHUB_WORKSPACE" archive origin/gh-pages -- preview/ 2>/dev/null | tar x 2>/dev/null; then
+            echo "Saved preview directory for restoration"
+            echo "has_preview=true" >> "$GITHUB_ENV"
+          else
+            echo "No preview directory to save"
+            echo "has_preview=false" >> "$GITHUB_ENV"
+          fi
+
+      # Copy saved preview into the publish dir so it's included in the deploy
+      - name: Restore preview into publish dir
+        if: steps.target.outputs.preview == 'false' && env.has_preview == 'true'
+        run: cp -r /tmp/preview-backup/preview webapp/preview
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./webapp
-          commit_message: "chore: deploy webapp from main [skip ci]"
-          keep_files: false
+          destination_dir: ${{ steps.target.outputs.dest }}
+          keep_files: ${{ steps.target.outputs.preview }}
+          commit_message: "chore: deploy webapp from ${{ github.ref_name }} [skip ci]"
