@@ -1,0 +1,14 @@
+# Python dependencies for sync.py
+# Run on Linux/macOS (or GitHub Actions ubuntu-latest) — not Windows native.
+#
+# Install:
+#   pip install -r requirements.txt
+#
+# NOTE: essentia-tensorflow has no Windows wheels.
+# On Linux/macOS: pip install essentia-tensorflow
+# On Windows: use GitHub Actions (see .github/workflows/sync.yml) or WSL2.
+
+spotipy>=2.23.0
+essentia-tensorflow  # only dev wheels exist; no version pin
+numpy>=1.24.0
+tqdm>=4.0.0

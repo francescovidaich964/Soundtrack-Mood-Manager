@@ -1,0 +1,6 @@
+{
+  "client_id": "YOUR_SPOTIFY_CLIENT_ID",
+  "client_secret": "YOUR_SPOTIFY_CLIENT_SECRET",
+  "playlist_id": "YOUR_SPOTIFY_PLAYLIST_ID",
+  "github_pages_url": "https://YOUR_USERNAME.github.io/Soundtrack-Mood-Manager"
+}

@@ -1,0 +1,31 @@
+# Local config (contains client_secret — never commit)
+config.json
+
+# Preview MP3s downloaded by test_spotify.py
+previews/
+
+# Venv
+.venv/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+env/
+
+# Essentia models (large binary files — download separately)
+models/*.pb
+
+# Temp download dir
+/tmp/
+
+# OS
+.DS_Store
+Thumbs.db
