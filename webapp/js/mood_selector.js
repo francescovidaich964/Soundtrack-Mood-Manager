@@ -1,87 +1,68 @@
 /**
- * mood_selector.js — nearest-neighbor soft-sampling on the 2D mood plane
+ * mood_selector.js — greedy nearest-neighbor selection on the 2D mood plane
  *
  * Tracks are plotted at (valence, energy) ∈ [0,1]².
- * When the DM moves the cursor to (x, y), pickNext() returns a track
- * sampled probabilistically with weight ∝ exp(−d²/σ²), where d is the
- * Euclidean distance from the cursor to each track.
+ * When the DM moves the cursor to (x, y), pickNext() returns the track
+ * closest to that point. If the cursor stays still, subsequent calls
+ * walk down the sorted list: 1st closest, 2nd closest, 3rd closest, etc.
  *
- * This "soft" sampling means:
- *   - Closer tracks are strongly preferred but not guaranteed.
- *   - The same track isn't always repeated when the cursor is stationary.
+ * Position-change detection resets the index and re-sorts the list,
+ * so a moved cursor always starts again from the globally closest track.
  *
- * A circular ring buffer of recently-played track IDs prevents immediate
- * repetitions. If the ring buffer would exhaust all candidates (tiny playlist),
- * it is cleared and sampling restarts.
+ * When all tracks have been played (index exhausts the sorted list),
+ * it wraps back to the closest track (index 0).
  */
-
 class MoodSelector {
   /**
-   * @param {Object[]} tracks  Array of track objects from window.TRACK_DATA.tracks.
-   *                           Each must have: track_id, valence, energy.
-   *                           Tracks with download_failed or analysis_failed are filtered out.
+   * @param {Object[]} tracks Array of track objects from window.TRACK_DATA.tracks.
+   * Each must have: track_id, valence, energy.
+   * Tracks with download_failed or analysis_failed are filtered out.
    */
   constructor(tracks) {
     // Only include tracks that were successfully analyzed.
     this._tracks = tracks.filter(
       t => typeof t.valence === "number" && typeof t.energy === "number"
     );
-
-    this._sigma = CONFIG.sigma;                       // spread parameter
-    this._recentSize = CONFIG.recentlyPlayedSize;     // ring buffer size
-    this._recentlyPlayed = [];                        // ring buffer
+    this._lastX = null;           // last cursor x (valence)
+    this._lastY = null;           // last cursor y (energy)
+    this._sortedCandidates = [];  // tracks sorted by distance from last point
+    this._playIndex = 0;          // index of next track to play in sorted list
   }
 
   /**
    * Pick the next track based on proximity to the given point.
    *
-   * @param {number} x  Valence axis ∈ [0,1]  (0 = sad, 1 = happy)
-   * @param {number} y  Energy axis  ∈ [0,1]  (0 = calm, 1 = energetic)
+   * If the cursor has moved since the last call, re-sort all tracks by
+   * Euclidean distance and reset the play index to 0 (closest track).
+   * If the cursor is stationary, advance the index to the next closest track.
+   *
+   * @param {number} x Valence axis ∈ [0,1] (0 = sad, 1 = happy)
+   * @param {number} y Energy axis ∈ [0,1] (0 = calm, 1 = energetic)
    * @returns {Object|null} Track object, or null if the playlist is empty.
    */
   pickNext(x, y) {
     if (this._tracks.length === 0) return null;
 
-    let candidates = this._tracks.filter(
-      t => !this._recentlyPlayed.includes(t.track_id)
-    );
+    const positionChanged = x !== this._lastX || y !== this._lastY;
 
-    // If the recently-played buffer has consumed all tracks (tiny playlist),
-    // clear it and try again with the full list.
-    if (candidates.length === 0) {
-      this._recentlyPlayed = [];
-      candidates = [...this._tracks];
+    if (positionChanged) {
+      // Re-sort all tracks by Euclidean distance to the new cursor position.
+      this._sortedCandidates = [...this._tracks].sort((a, b) => {
+        const da = (a.valence - x) ** 2 + (a.energy - y) ** 2;
+        const db = (b.valence - x) ** 2 + (b.energy - y) ** 2;
+        return da - db;
+      });
+      this._playIndex = 0;
+      this._lastX = x;
+      this._lastY = y;
     }
 
-    // Compute soft-sampling weights: w_i = exp(−d²/σ²)
-    const sigma2 = this._sigma * this._sigma;
-    const weights = candidates.map(t => {
-      const dx = t.valence - x;
-      const dy = t.energy  - y;
-      const d2 = dx * dx + dy * dy;
-      return Math.exp(-d2 / sigma2);
-    });
-
-    const totalWeight = weights.reduce((s, w) => s + w, 0);
-
-    // Weighted random sample.
-    let rand = Math.random() * totalWeight;
-    let chosen = candidates[candidates.length - 1]; // fallback (should not happen)
-    for (let i = 0; i < candidates.length; i++) {
-      rand -= weights[i];
-      if (rand <= 0) {
-        chosen = candidates[i];
-        break;
-      }
+    // Wrap around if we have exhausted the full sorted list.
+    if (this._playIndex >= this._sortedCandidates.length) {
+      this._playIndex = 0;
     }
 
-    // Push to ring buffer (evict oldest if full).
-    this._recentlyPlayed.push(chosen.track_id);
-    if (this._recentlyPlayed.length > this._recentSize) {
-      this._recentlyPlayed.shift();
-    }
-
-    return chosen;
+    return this._sortedCandidates[this._playIndex++];
   }
 
   /** Return all analyzable tracks (used by UI to draw scatter plot). */
