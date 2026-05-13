@@ -1,0 +1,104 @@
+name: Sync Playlist
+
+on:
+  workflow_dispatch:
+    inputs:
+      playlist:
+        description: "Spotify playlist URL or ID (overrides SPOTIFY_PLAYLIST_ID secret)"
+        required: false
+        type: string
+      force_reanalyze:
+        description: "Re-analyze all tracks even if cached"
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # needed by peaceiris/actions-gh-pages to push gh-pages branch
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+
+      # ------------------------------------------------------------------
+      # Cache Essentia .pb models so we don't re-download them every run.
+      # The cache key includes the model filenames; change it if you swap models.
+      # ------------------------------------------------------------------
+      - name: Cache Essentia models
+        id: cache-models
+        uses: actions/cache@v4
+        with:
+          path: models/
+          key: essentia-models-msd-musicnn-1-emomusic-msd-musicnn-2
+
+      - name: Download Essentia models (if not cached)
+        if: steps.cache-models.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p models
+          curl -fL -o models/msd-musicnn-1.pb \
+            https://essentia.upf.edu/models/feature-extractors/musicnn/msd-musicnn-1.pb
+          curl -fL -o models/emomusic-msd-musicnn-2.pb \
+            https://essentia.upf.edu/models/classification-heads/emomusic/emomusic-msd-musicnn-2.pb
+          echo "Models downloaded:"
+          ls -lh models/
+
+      # ------------------------------------------------------------------
+      # Python environment
+      # ------------------------------------------------------------------
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: pip-
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # ------------------------------------------------------------------
+      # Verify secrets are set before running sync
+      # ------------------------------------------------------------------
+      - name: Check secrets
+        run: |
+          echo "SPOTIFY_CLIENT_ID set:     ${{ secrets.SPOTIFY_CLIENT_ID != '' }}"
+          echo "SPOTIFY_CLIENT_SECRET set: ${{ secrets.SPOTIFY_CLIENT_SECRET != '' }}"
+          echo "SPOTIFY_PLAYLIST_ID set:   ${{ secrets.SPOTIFY_PLAYLIST_ID != '' }}"
+          echo "SPOTIFY_REFRESH_TOKEN set: ${{ secrets.SPOTIFY_REFRESH_TOKEN != '' }}"
+
+      # ------------------------------------------------------------------
+      # Run sync.py
+      # ------------------------------------------------------------------
+      - name: Run sync
+        env:
+          SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
+          SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
+          SPOTIFY_PLAYLIST_ID: ${{ inputs.playlist || secrets.SPOTIFY_PLAYLIST_ID }}
+          SPOTIFY_REFRESH_TOKEN: ${{ secrets.SPOTIFY_REFRESH_TOKEN }}
+          GITHUB_PAGES_URL: "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"
+        run: |
+          EXTRA_FLAGS=""
+          if [ "${{ inputs.force_reanalyze }}" = "true" ]; then
+            EXTRA_FLAGS="--force-reanalyze"
+          fi
+          python sync.py $EXTRA_FLAGS
+
+      # ------------------------------------------------------------------
+      # Deploy webapp/ (with generated data.js + config.js) to gh-pages.
+      # main branch is never touched.
+      # ------------------------------------------------------------------
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./webapp
+          commit_message: "chore: sync playlist [skip ci]"
+          # Keep previous files in gh-pages (don't wipe on every deploy).
+          keep_files: false

@@ -1,0 +1,38 @@
+name: Deploy Webapp
+
+# Triggers on every push to main so that changes to webapp source files
+# (index.html, js/, css/) are reflected on GitHub Pages immediately,
+# without needing to re-run the full Essentia sync.
+#
+# Generated files (data.js, config.js) are preserved from the current
+# gh-pages branch so playlist data is never lost.
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+
+      # Restore generated files from gh-pages (if they exist).
+      # Falls back silently on the very first deploy (no gh-pages yet).
+      - name: Restore generated files from gh-pages
+        run: |
+          git fetch origin gh-pages 2>/dev/null || true
+          git show origin/gh-pages:data.js          > webapp/data.js       2>/dev/null || true
+          git show origin/gh-pages:js/config.js   > webapp/js/config.js  2>/dev/null || true
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./webapp
+          commit_message: "chore: deploy webapp from main [skip ci]"
+          keep_files: false
