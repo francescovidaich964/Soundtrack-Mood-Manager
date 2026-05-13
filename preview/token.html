@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>DnD Soundtrack — Token Setup</title>
+  <style>
+    body {
+      background: #0d0d1a;
+      color: #e8e0d0;
+      font-family: Georgia, serif;
+      padding: 2rem;
+      max-width: 700px;
+      margin: 4rem auto;
+    }
+    h2   { color: #c9a84c; margin-bottom: 0.5rem; }
+    p    { color: rgba(232,224,208,0.7); margin-bottom: 1.5rem; }
+    .box {
+      background: #0a0a18;
+      border: 1px solid rgba(201,168,76,0.5);
+      padding: 1rem 1.2rem;
+      border-radius: 3px;
+      word-break: break-all;
+      font-family: "Courier New", monospace;
+      font-size: 0.85rem;
+      color: #c9a84c;
+      cursor: text;
+      user-select: all;
+    }
+    .hint { font-size: 0.78rem; color: rgba(232,224,208,0.4); margin-top: 0.75rem; }
+  </style>
+</head>
+<body>
+  <h2>Token Setup</h2>
+  <p>
+    Copy the full URL below and paste it back into the terminal
+    running <code>get_refresh_token.py</code>.
+  </p>
+  <div class="box" id="url">Loading…</div>
+  <p class="hint">Click the box to select all, then Ctrl+C / Cmd+C to copy.</p>
+
+  <script>
+    document.getElementById("url").textContent = window.location.href;
+  </script>
+</body>
+</html>
