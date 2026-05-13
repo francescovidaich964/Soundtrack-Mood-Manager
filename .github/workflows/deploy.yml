@@ -10,6 +10,9 @@ name: Deploy Webapp
 on:
   push:
     branches: ['**']
+    paths:
+      - 'webapp/**'
+      - '.github/workflows/deploy.yml'
   workflow_dispatch:
 
 jobs:

@@ -158,7 +158,7 @@ To force re-analysis of every track (e.g. after switching playlists), check **fo
 
 You can develop and test on feature branches without touching production.
 
-- **Webapp changes**: push to any non-main branch → the deploy workflow auto-deploys to `/preview/` on GitHub Pages.
+- **Webapp changes**: push changes inside `webapp/` to any non-main branch → the deploy workflow auto-deploys to `/preview/` on GitHub Pages.
 - **Sync changes**: go to Actions → Sync Playlist → Run workflow → pick your feature branch from the branch dropdown.
 - **Test** at `https://<you>.github.io/Soundtrack-Mood-Manager/preview/`.
 - When ready, open a PR to `main` and squash-merge. Production at `/` updates automatically.

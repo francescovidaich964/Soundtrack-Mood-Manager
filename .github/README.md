@@ -29,7 +29,7 @@ Two workflows exist. They share the same deployment target (`gh-pages`) but serv
 
 ### deploy.yml — Deploy Webapp
 
-**Trigger:** Every push to any branch, or manually via `workflow_dispatch`.
+**Trigger:** Push to any branch when files inside `webapp/` or `deploy.yml` itself change, or manually via `workflow_dispatch`.
 
 **Purpose:** Deploy source file changes (HTML/CSS/JS) to Pages quickly, without running the expensive Essentia sync.
 
@@ -152,7 +152,7 @@ main ─────────────────────────
 
 **Day-to-day:**
 1. `git checkout -b feat/xyz` from main
-2. Push commits — deploy.yml auto-deploys to `/preview/` on each push
+2. Push `webapp/` changes — deploy.yml auto-deploys to `/preview/`
 3. To test sync changes: Actions → Sync Playlist → Run workflow → select `feat/xyz`
 4. Test on `https://<you>.github.io/<repo>/preview/`
 5. PR → main, squash merge → production updated, preview remains until overwritten
