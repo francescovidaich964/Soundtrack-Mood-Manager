@@ -53,6 +53,7 @@ const UI = (() => {
   let _onPointChanged  = null;  // (x, y) => void — called while dragging
   let _onPlayPause     = null;  // () => void
   let _onNext          = null;  // () => void
+  let _onSeek          = null;  // (positionMs) => void
 
   // ------------------------------------------------------------------
   // Coordinate helpers
@@ -289,6 +290,19 @@ const UI = (() => {
     _canvas.addEventListener("touchend", () => { _dragging = false; });
   }
 
+  function _bindProgressBarEvents() {
+    const container = document.querySelector(".progress-container");
+    if (!container) return;
+    container.style.cursor = "pointer";
+    container.addEventListener("click", e => {
+      if (!_playbackState || !_playbackState.duration) return;
+      const rect = container.getBoundingClientRect();
+      const fraction = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+      const positionMs = fraction * _playbackState.duration;
+      if (_onSeek) _onSeek(positionMs);
+    });
+  }
+
   // ------------------------------------------------------------------
   // Public API
   // ------------------------------------------------------------------
@@ -299,12 +313,14 @@ const UI = (() => {
    * @param {function} onPointChanged  (x, y) => void — cursor moved
    * @param {function} onPlayPause     () => void
    * @param {function} onNext          () => void
+   * @param {function} onSeek          (positionMs) => void
    */
-  function init(moodSelector, onPointChanged, onPlayPause, onNext) {
+  function init(moodSelector, onPointChanged, onPlayPause, onNext, onSeek) {
     _moodSelector    = moodSelector;
     _onPointChanged  = onPointChanged;
     _onPlayPause     = onPlayPause;
     _onNext          = onNext;
+    _onSeek          = onSeek;
 
     _canvas = document.getElementById("mood-canvas");
     _ctx    = _canvas.getContext("2d");
@@ -312,6 +328,7 @@ const UI = (() => {
     _canvas.height = CANVAS_SIZE;
 
     _bindCanvasEvents();
+    _bindProgressBarEvents();
 
     document.getElementById("btn-play-pause")
       ?.addEventListener("click", () => _onPlayPause && _onPlayPause());
