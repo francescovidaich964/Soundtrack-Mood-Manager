@@ -217,7 +217,8 @@ const UI = (() => {
     _ctx.save();
     _ctx.translate(10, CANVAS_SIZE / 2);
     _ctx.rotate(-Math.PI / 2);
-    _ctx.fillText("energetic ↑", 0, 0);
+    _ctx.fillText("← calm",       -(CANVAS_SIZE / 2 - 36), 0);
+    _ctx.fillText("energetic →",    CANVAS_SIZE / 2 - 36,  0);
     _ctx.restore();
 
     // --- Minimap (only when zoomed in) ---
