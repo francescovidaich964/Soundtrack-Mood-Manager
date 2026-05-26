@@ -112,6 +112,13 @@ const UI = (() => {
     };
   }
 
+  function _worldToScreen(wx, wy) {
+    return {
+      sx: (wx - _viewOffset.x) * _viewScale,
+      sy: (wy - _viewOffset.y) * _viewScale,
+    };
+  }
+
   function _clampViewport() {
     const maxOff = CANVAS_SIZE * (1 - 1 / _viewScale);
     _viewOffset.x = Math.max(0, Math.min(maxOff, _viewOffset.x));
@@ -138,34 +145,32 @@ const UI = (() => {
     if (!_ctx || !_moodSelector) return;
     _ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
 
-    // Apply viewport transform for tracks and cursor
+    // Clip to canvas bounds so tracks near edges don't bleed outside
     _ctx.save();
-    _ctx.setTransform(
-      _viewScale, 0,
-      0, _viewScale,
-      -_viewOffset.x * _viewScale,
-      -_viewOffset.y * _viewScale
-    );
+    _ctx.beginPath();
+    _ctx.rect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+    _ctx.clip();
 
     const tracks = _moodSelector.getTracks();
 
-    // --- Track dots ---
+    // --- Track dots (drawn in screen space so size is constant regardless of zoom) ---
     for (const track of tracks) {
       const { x, y } = _toCanvas(track.valence, track.energy);
+      const { sx, sy } = _worldToScreen(x, y);
       const isPlaying = track.track_id === _playingTrackId;
       const isHovered = _hoveredTrack && track.track_id === _hoveredTrack.track_id;
 
       if (isPlaying) {
         // Outer ring
         _ctx.beginPath();
-        _ctx.arc(x, y, TRACK_RADIUS + PLAYING_RING, 0, Math.PI * 2);
+        _ctx.arc(sx, sy, TRACK_RADIUS + PLAYING_RING, 0, Math.PI * 2);
         _ctx.strokeStyle = "rgba(201,168,76,0.6)";
         _ctx.lineWidth = 2;
         _ctx.stroke();
       }
 
       _ctx.beginPath();
-      _ctx.arc(x, y, isHovered ? TRACK_RADIUS + 2 : TRACK_RADIUS, 0, Math.PI * 2);
+      _ctx.arc(sx, sy, isHovered ? TRACK_RADIUS + 2 : TRACK_RADIUS, 0, Math.PI * 2);
       _ctx.fillStyle = isPlaying
         ? "rgba(201,168,76,0.9)"
         : isHovered
@@ -174,19 +179,20 @@ const UI = (() => {
       _ctx.fill();
     }
 
-    // --- Cursor ---
-    const cp = _toCanvas(_currentPoint.x, _currentPoint.y);
+    // --- Cursor (screen space, fixed size) ---
+    const { x: cpwx, y: cpwy } = _toCanvas(_currentPoint.x, _currentPoint.y);
+    const { sx: cpx, sy: cpy } = _worldToScreen(cpwx, cpwy);
 
     // Outer ring
     _ctx.beginPath();
-    _ctx.arc(cp.x, cp.y, CURSOR_RADIUS + 4, 0, Math.PI * 2);
+    _ctx.arc(cpx, cpy, CURSOR_RADIUS + 4, 0, Math.PI * 2);
     _ctx.strokeStyle = "rgba(255,255,255,0.3)";
     _ctx.lineWidth = 1;
     _ctx.stroke();
 
     // Inner circle
     _ctx.beginPath();
-    _ctx.arc(cp.x, cp.y, CURSOR_RADIUS, 0, Math.PI * 2);
+    _ctx.arc(cpx, cpy, CURSOR_RADIUS, 0, Math.PI * 2);
     _ctx.fillStyle = "rgba(255,255,255,0.85)";
     _ctx.fill();
 
@@ -194,10 +200,10 @@ const UI = (() => {
     _ctx.strokeStyle = "rgba(13,13,26,0.8)";
     _ctx.lineWidth = 1.5;
     _ctx.beginPath();
-    _ctx.moveTo(cp.x - 5, cp.y);
-    _ctx.lineTo(cp.x + 5, cp.y);
-    _ctx.moveTo(cp.x, cp.y - 5);
-    _ctx.lineTo(cp.x, cp.y + 5);
+    _ctx.moveTo(cpx - 5, cpy);
+    _ctx.lineTo(cpx + 5, cpy);
+    _ctx.moveTo(cpx, cpy - 5);
+    _ctx.lineTo(cpx, cpy + 5);
     _ctx.stroke();
 
     _ctx.restore();
