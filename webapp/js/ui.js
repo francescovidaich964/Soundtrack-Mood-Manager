@@ -10,6 +10,10 @@
  *   - Draggable cursor: shows the current mood point.
  *   - Hover tooltip: shows title + artist of the nearest track.
  *   - Currently playing track highlighted with a larger, brighter ring.
+ *   - Zoom: scroll wheel / trackpad pinch to zoom in (up to 8×); cannot zoom out past default.
+ *   - Pan: drag pans when zoomed; drag moves cursor when at default zoom.
+ *   - Click/tap (no significant drag): places cursor at that point.
+ *   - Minimap: shown in top-left corner when zoomed in.
  *
  * Player Controls:
  *   - Track title + artist label
@@ -22,11 +26,15 @@
  */
 
 const UI = (() => {
-  const CANVAS_SIZE = 400;
-  const TRACK_RADIUS = 5;
-  const CURSOR_RADIUS = 10;
-  const HOVER_RADIUS  = 14;  // hit-test distance in pixels
-  const PLAYING_RING  = 10;  // extra ring drawn around the current track
+  const CANVAS_SIZE    = 400;
+  const TRACK_RADIUS   = 5;
+  const CURSOR_RADIUS  = 10;
+  const HOVER_RADIUS   = 14;   // hit-test distance in pixels (screen space)
+  const PLAYING_RING   = 10;   // extra ring drawn around the current track
+  const MAX_SCALE      = 8;    // maximum zoom multiplier
+  const MINIMAP_SIZE   = 80;   // minimap side length in canvas pixels
+  const MINIMAP_MARGIN = 8;    // minimap distance from canvas edge
+  const PAN_THRESHOLD  = 4;    // pixels of movement before drag = pan (not click)
 
   // Internal state
   let _canvas = null;
@@ -42,8 +50,18 @@ const UI = (() => {
   let _stateTimestamp = 0;     // Date.now() when _playbackState was recorded
   let _rafId = null;
 
-  // Drag state
-  let _dragging = false;
+  // Viewport state
+  let _viewScale  = 1.0;
+  let _viewOffset = { x: 0, y: 0 };  // top-left world canvas pixel of viewport
+
+  // Pan/click disambiguation
+  // _panStart.cx/cy updated each mousemove frame for per-frame deltas (avoids edge dead zone)
+  // isClick stays true until PAN_THRESHOLD is crossed
+  let _panStart = null;  // { cx, cy, isClick }
+  let _panMoved = false;
+
+  // Touch gesture state
+  let _touchState = null;
 
   // Tooltip state
   let _hoveredTrack = null;
@@ -84,12 +102,50 @@ const UI = (() => {
   }
 
   // ------------------------------------------------------------------
+  // Viewport helpers
+  // ------------------------------------------------------------------
+
+  function _screenToWorld(scx, scy) {
+    return {
+      cx: scx / _viewScale + _viewOffset.x,
+      cy: scy / _viewScale + _viewOffset.y,
+    };
+  }
+
+  function _clampViewport() {
+    const maxOff = CANVAS_SIZE * (1 - 1 / _viewScale);
+    _viewOffset.x = Math.max(0, Math.min(maxOff, _viewOffset.x));
+    _viewOffset.y = Math.max(0, Math.min(maxOff, _viewOffset.y));
+  }
+
+  function _applyZoom(factor, scx, scy) {
+    const newScale = Math.max(1, Math.min(MAX_SCALE, _viewScale * factor));
+    if (newScale === _viewScale) return;
+    // Keep the world point under (scx, scy) fixed on screen
+    const worldX = scx / _viewScale + _viewOffset.x;
+    const worldY = scy / _viewScale + _viewOffset.y;
+    _viewScale = newScale;
+    _viewOffset.x = worldX - scx / _viewScale;
+    _viewOffset.y = worldY - scy / _viewScale;
+    _clampViewport();
+  }
+
+  // ------------------------------------------------------------------
   // Drawing
   // ------------------------------------------------------------------
 
   function _draw() {
     if (!_ctx || !_moodSelector) return;
     _ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+    // Apply viewport transform for tracks and cursor
+    _ctx.save();
+    _ctx.setTransform(
+      _viewScale, 0,
+      0, _viewScale,
+      -_viewOffset.x * _viewScale,
+      -_viewOffset.y * _viewScale
+    );
 
     const tracks = _moodSelector.getTracks();
 
@@ -144,7 +200,9 @@ const UI = (() => {
     _ctx.lineTo(cp.x, cp.y + 5);
     _ctx.stroke();
 
-    // --- Axis labels (subtle) ---
+    _ctx.restore();
+
+    // --- Axis labels (fixed screen positions, not affected by zoom) ---
     _ctx.fillStyle = "rgba(232,224,208,0.25)";
     _ctx.font = "11px serif";
     _ctx.textAlign = "center";
@@ -155,22 +213,72 @@ const UI = (() => {
     _ctx.rotate(-Math.PI / 2);
     _ctx.fillText("energetic ↑", 0, 0);
     _ctx.restore();
+
+    // --- Minimap (only when zoomed in) ---
+    _drawMinimap();
+  }
+
+  function _drawMinimap() {
+    if (_viewScale <= 1) return;
+
+    const M  = MINIMAP_SIZE;
+    const mg = MINIMAP_MARGIN;
+    const mx = mg;
+    const my = mg;
+
+    // Background
+    _ctx.fillStyle = "rgba(13,13,26,0.75)";
+    _ctx.fillRect(mx, my, M, M);
+    _ctx.strokeStyle = "rgba(232,224,208,0.25)";
+    _ctx.lineWidth = 1;
+    _ctx.strokeRect(mx, my, M, M);
+
+    // Track dots
+    for (const t of _moodSelector.getTracks()) {
+      _ctx.beginPath();
+      _ctx.arc(mx + t.valence * M, my + (1 - t.energy) * M, 1.5, 0, Math.PI * 2);
+      _ctx.fillStyle = t.track_id === _playingTrackId
+        ? "rgba(201,168,76,0.9)"
+        : "rgba(201,168,76,0.35)";
+      _ctx.fill();
+    }
+
+    // Cursor dot
+    _ctx.beginPath();
+    _ctx.arc(
+      mx + _currentPoint.x * M,
+      my + (1 - _currentPoint.y) * M,
+      2.5, 0, Math.PI * 2
+    );
+    _ctx.fillStyle = "rgba(255,255,255,0.85)";
+    _ctx.fill();
+
+    // Viewport indicator rectangle
+    _ctx.strokeStyle = "rgba(255,255,255,0.55)";
+    _ctx.lineWidth = 1;
+    _ctx.strokeRect(
+      mx + (_viewOffset.x / CANVAS_SIZE) * M,
+      my + (_viewOffset.y / CANVAS_SIZE) * M,
+      M / _viewScale,
+      M / _viewScale
+    );
   }
 
   // ------------------------------------------------------------------
   // Tooltip
   // ------------------------------------------------------------------
 
-  function _findNearestTrack(cx, cy) {
+  function _findNearestTrack(wcx, wcy) {
     if (!_moodSelector) return null;
+    // Threshold is in world canvas pixels; scale so it feels constant on screen
+    const threshold = (HOVER_RADIUS / _viewScale) ** 2;
     let best = null;
-    let bestDist = HOVER_RADIUS * HOVER_RADIUS;
+    let bestDist = threshold;
 
     for (const t of _moodSelector.getTracks()) {
       const pos = _toCanvas(t.valence, t.energy);
-      const d2  = (pos.x - cx) ** 2 + (pos.y - cy) ** 2;
+      const d2  = (pos.x - wcx) ** 2 + (pos.y - wcy) ** 2;
       if (d2 < bestDist) {
-        bestDist = best ? bestDist : d2; // keep shrinking threshold
         bestDist = d2;
         best = t;
       }
@@ -236,30 +344,70 @@ const UI = (() => {
   // ------------------------------------------------------------------
 
   function _bindCanvasEvents() {
-    _canvas.addEventListener("mousedown", e => {
-      _dragging = true;
+    // --- Wheel zoom (scroll wheel + trackpad two-finger scroll) ---
+    _canvas.addEventListener("wheel", e => {
+      e.preventDefault();
       const { cx, cy } = _canvasXY(e);
-      _currentPoint = _fromCanvas(cx, cy);
-      if (_onPointChanged) _onPointChanged(_currentPoint.x, _currentPoint.y);
+      _applyZoom(e.deltaY < 0 ? 1.2 : 1 / 1.2, cx, cy);
       _draw();
+    }, { passive: false });
+
+    // --- Mouse ---
+    _canvas.addEventListener("mousedown", e => {
+      const { cx, cy } = _canvasXY(e);
+      _panStart = { cx, cy, isClick: true };
+      _panMoved = false;
     });
 
     _canvas.addEventListener("mousemove", e => {
       const { cx, cy } = _canvasXY(e);
-      _mousePos = { x: e.clientX - _canvas.getBoundingClientRect().left, y: e.clientY - _canvas.getBoundingClientRect().top };
+      _mousePos = {
+        x: e.clientX - _canvas.getBoundingClientRect().left,
+        y: e.clientY - _canvas.getBoundingClientRect().top,
+      };
 
-      if (_dragging) {
-        _currentPoint = _fromCanvas(cx, cy);
-        if (_onPointChanged) _onPointChanged(_currentPoint.x, _currentPoint.y);
+      if (_panStart) {
+        const ddx = cx - _panStart.cx;
+        const ddy = cy - _panStart.cy;
+        if (Math.abs(ddx) > PAN_THRESHOLD || Math.abs(ddy) > PAN_THRESHOLD) {
+          _panMoved = true;
+          _panStart.isClick = false;
+        }
+        if (_panMoved) {
+          if (_viewScale > 1) {
+            // Zoomed: drag pans the viewport
+            _viewOffset.x -= ddx / _viewScale;
+            _viewOffset.y -= ddy / _viewScale;
+            _clampViewport();
+          } else {
+            // Not zoomed: drag moves the cursor (existing behaviour)
+            const { cx: wcx, cy: wcy } = _screenToWorld(cx, cy);
+            _currentPoint = _fromCanvas(wcx, wcy);
+            if (_onPointChanged) _onPointChanged(_currentPoint.x, _currentPoint.y);
+          }
+        }
+        // Update each frame so next delta is computed from current position
+        // (avoids dead zone when pushing against a clamped viewport edge)
+        _panStart.cx = cx;
+        _panStart.cy = cy;
       }
 
-      _hoveredTrack = _findNearestTrack(cx, cy);
+      const { cx: wcx, cy: wcy } = _screenToWorld(cx, cy);
+      _hoveredTrack = _findNearestTrack(wcx, wcy);
       _updateTooltip();
       _draw();
     });
 
     window.addEventListener("mouseup", () => {
-      _dragging = false;
+      if (_panStart?.isClick) {
+        // Pure click (no drag) → place cursor at that position
+        const { cx: wcx, cy: wcy } = _screenToWorld(_panStart.cx, _panStart.cy);
+        _currentPoint = _fromCanvas(wcx, wcy);
+        if (_onPointChanged) _onPointChanged(_currentPoint.x, _currentPoint.y);
+        _draw();
+      }
+      _panStart = null;
+      _panMoved = false;
     });
 
     _canvas.addEventListener("mouseleave", () => {
@@ -268,26 +416,86 @@ const UI = (() => {
       _draw();
     });
 
-    // Touch support (for tablets)
+    // --- Touch ---
     _canvas.addEventListener("touchstart", e => {
       e.preventDefault();
-      _dragging = true;
-      const { cx, cy } = _canvasXY(e.touches[0]);
-      _currentPoint = _fromCanvas(cx, cy);
-      if (_onPointChanged) _onPointChanged(_currentPoint.x, _currentPoint.y);
-      _draw();
+      if (e.touches.length === 1) {
+        const { cx, cy } = _canvasXY(e.touches[0]);
+        _touchState = {
+          type: "single",
+          cx, cy,        // updated each touchmove frame for per-frame deltas
+          isClick: true,
+          moved: false,
+        };
+      } else if (e.touches.length === 2) {
+        const t1 = _canvasXY(e.touches[0]);
+        const t2 = _canvasXY(e.touches[1]);
+        _touchState = {
+          type: "pinch",
+          startDist:   Math.hypot(t2.cx - t1.cx, t2.cy - t1.cy),
+          startScale:  _viewScale,
+          startOffsetX: _viewOffset.x,
+          startOffsetY: _viewOffset.y,
+          midX: (t1.cx + t2.cx) / 2,
+          midY: (t1.cy + t2.cy) / 2,
+        };
+      }
     }, { passive: false });
 
     _canvas.addEventListener("touchmove", e => {
       e.preventDefault();
-      if (!_dragging) return;
-      const { cx, cy } = _canvasXY(e.touches[0]);
-      _currentPoint = _fromCanvas(cx, cy);
-      if (_onPointChanged) _onPointChanged(_currentPoint.x, _currentPoint.y);
-      _draw();
+      if (!_touchState) return;
+
+      if (_touchState.type === "single" && e.touches.length === 1) {
+        const { cx, cy } = _canvasXY(e.touches[0]);
+        const ddx = cx - _touchState.cx;
+        const ddy = cy - _touchState.cy;
+        if (Math.abs(ddx) > PAN_THRESHOLD || Math.abs(ddy) > PAN_THRESHOLD) {
+          _touchState.moved = true;
+          _touchState.isClick = false;
+        }
+        if (_touchState.moved) {
+          if (_viewScale > 1) {
+            _viewOffset.x -= ddx / _viewScale;
+            _viewOffset.y -= ddy / _viewScale;
+            _clampViewport();
+          } else {
+            const { cx: wcx, cy: wcy } = _screenToWorld(cx, cy);
+            _currentPoint = _fromCanvas(wcx, wcy);
+            if (_onPointChanged) _onPointChanged(_currentPoint.x, _currentPoint.y);
+          }
+          _draw();
+        }
+        _touchState.cx = cx;
+        _touchState.cy = cy;
+      } else if (_touchState.type === "pinch" && e.touches.length === 2) {
+        const t1 = _canvasXY(e.touches[0]);
+        const t2 = _canvasXY(e.touches[1]);
+        const dist = Math.hypot(t2.cx - t1.cx, t2.cy - t1.cy);
+        const newScale = Math.max(1, Math.min(MAX_SCALE,
+          _touchState.startScale * dist / _touchState.startDist));
+        // Keep the world point under the initial pinch midpoint fixed
+        const worldMidX = _touchState.midX / _touchState.startScale + _touchState.startOffsetX;
+        const worldMidY = _touchState.midY / _touchState.startScale + _touchState.startOffsetY;
+        _viewScale = newScale;
+        _viewOffset.x = worldMidX - _touchState.midX / _viewScale;
+        _viewOffset.y = worldMidY - _touchState.midY / _viewScale;
+        _clampViewport();
+        _draw();
+      }
     }, { passive: false });
 
-    _canvas.addEventListener("touchend", () => { _dragging = false; });
+    _canvas.addEventListener("touchend", e => {
+      if (_touchState?.isClick) {
+        // Tap without drag → place cursor
+        const { cx, cy } = _canvasXY(e.changedTouches[0]);
+        const { cx: wcx, cy: wcy } = _screenToWorld(cx, cy);
+        _currentPoint = _fromCanvas(wcx, wcy);
+        if (_onPointChanged) _onPointChanged(_currentPoint.x, _currentPoint.y);
+        _draw();
+      }
+      _touchState = null;
+    });
   }
 
   function _bindProgressBarEvents() {
