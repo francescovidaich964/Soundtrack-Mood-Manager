@@ -121,28 +121,21 @@
         },
         /* onPlayPause */ async () => {
           if (!deviceId) return;
-          if (isPlaying) {
-            await Player.pause();
-            isPlaying = false;
-          } else {
-            // If nothing is loaded yet, pick a first track.
-            const state = await (async () => {
-              try {
-                const p = window.Spotify && await new Promise(r => {
-                  // We can't easily peek at the SDK state before init here,
-                  // so just attempt resume and fall back to picking a track.
-                  return null;
-                });
-                return p;
-              } catch { return null; }
-            })();
-
+          const state = await Player.getCurrentState();
+          if (!state) {
+            // Nothing loaded yet — pick the closest track and start playing.
             const pt = UI.getCurrentPoint();
             const track = selector.pickNext(pt.x, pt.y);
             if (track) {
               await SpotifyAPI.playTrack(deviceId, track.uri);
               isPlaying = true;
             }
+          } else if (state.paused) {
+            await Player.resume();
+            isPlaying = true;
+          } else {
+            await Player.pause();
+            isPlaying = false;
           }
         },
         /* onNext */ async () => {

@@ -148,6 +148,12 @@ const Player = (() => {
     if (_player) await _player.resume();
   }
 
+  /** Returns the current SDK playback state, or null if not ready. */
+  async function getCurrentState() {
+    if (!_player) return null;
+    return _player.getCurrentState();
+  }
+
   /** Toggle pause/resume. Returns true if now playing, false if paused. */
   async function togglePlayPause() {
     if (!_player) return false;
@@ -162,5 +168,5 @@ const Player = (() => {
     }
   }
 
-  return { init, waitForReady, getDeviceId, pause, resume, togglePlayPause };
+  return { init, waitForReady, getDeviceId, getCurrentState, pause, resume, togglePlayPause };
 })();

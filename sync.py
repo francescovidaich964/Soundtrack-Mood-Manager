@@ -28,6 +28,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -138,6 +139,32 @@ def start_local_server(webapp_dir: Path, port: int) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Cache-busting helper
+# ---------------------------------------------------------------------------
+
+def _update_data_version(webapp_dir: Path, generated_at: str) -> None:
+    """Stamp data.js script tag in index.html with a version query parameter.
+
+    Forces the browser to fetch a fresh copy of data.js after every sync,
+    bypassing the GitHub Pages HTTP cache (max-age=600).
+    """
+    index_html = webapp_dir / "index.html"
+    if not index_html.exists():
+        return
+
+    content = index_html.read_text(encoding="utf-8")
+    version = re.sub(r"[^0-9]", "", generated_at)[:14]  # e.g. "20260525103000"
+    new_content = re.sub(
+        r'(<script[^>]+\bsrc=")data\.js(?:\?[^"]*)?"',
+        f'\\1data.js?v={version}"',
+        content,
+    )
+    if new_content != content:
+        index_html.write_text(new_content, encoding="utf-8")
+        print(f"  data.js version stamp updated: ?v={version}")
+
+
+# ---------------------------------------------------------------------------
 # Main sync flow
 # ---------------------------------------------------------------------------
 
@@ -209,7 +236,8 @@ def main() -> None:
         else:
             tracks_to_write.append(t)  # valence/energy to be filled in below
 
-    write_data_js(data_js_path, playlist_name, playlist_id, tracks_to_write)
+    generated_at = write_data_js(data_js_path, playlist_name, playlist_id, tracks_to_write)
+    _update_data_version(webapp_dir, generated_at)
 
     # ------------------------------------------------------------------
     # 4. Analyze tracks that don't have valence/energy yet

@@ -58,7 +58,7 @@ def write_data_js(
     playlist_name: str,
     playlist_id: str,
     tracks: list[dict],
-) -> None:
+) -> str:
     """Serialize the full track list and write data.js.
 
     Args:
@@ -66,6 +66,9 @@ def write_data_js(
         playlist_name: Human-readable playlist name.
         playlist_id: Spotify playlist ID.
         tracks: List of track dicts. Each must have at least 'track_id'.
+
+    Returns:
+        The generated_at ISO timestamp string.
     """
     path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -82,6 +85,7 @@ def write_data_js(
         json_body=json_body,
     )
     path.write_text(content, encoding="utf-8")
+    return data["generated_at"]
 
 
 def update_track(path: Path, track_id: str, fields: dict) -> None:
