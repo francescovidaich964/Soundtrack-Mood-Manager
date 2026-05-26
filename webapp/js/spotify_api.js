@@ -81,6 +81,11 @@ const SpotifyAPI = (() => {
     return _request("PUT", "/me/player/play");
   }
 
+  /** Seek to a position in the current track. */
+  async function seekTo(positionMs) {
+    return _request("PUT", `/me/player/seek?position_ms=${Math.round(positionMs)}`);
+  }
+
   /**
    * Transfer playback to a specific device and optionally start playing.
    * Call this after the Web Playback SDK emits 'ready' to make the browser
@@ -95,5 +100,5 @@ const SpotifyAPI = (() => {
     });
   }
 
-  return { playTrack, pause, resume, transferPlayback };
+  return { playTrack, pause, resume, seekTo, transferPlayback };
 })();

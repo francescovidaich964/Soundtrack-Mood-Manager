@@ -147,6 +147,10 @@
             isPlaying = true;
           }
         },
+        /* onSeek */ async (positionMs) => {
+          if (!deviceId) return;
+          await SpotifyAPI.seekTo(positionMs);
+        },
       );
 
       // Playlist footer
