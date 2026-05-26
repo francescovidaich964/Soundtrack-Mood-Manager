@@ -68,7 +68,7 @@
     8. app.js (inline) — wires everything together
     9. Spotify SDK  — async so it doesn't block; triggers onSpotifyWebPlaybackSDKReady
   -->
-  <script defer src="data.js?v=20260525094347"></script>
+  <script defer src="data.js"></script>
   <script defer src="js/config.js"></script>
   <script defer src="js/auth.js"></script>
   <script defer src="js/spotify_api.js"></script>
@@ -146,6 +146,10 @@
             await SpotifyAPI.playTrack(deviceId, track.uri);
             isPlaying = true;
           }
+        },
+        /* onSeek */ async (positionMs) => {
+          if (!deviceId) return;
+          await SpotifyAPI.seekTo(positionMs);
         },
       );
 
