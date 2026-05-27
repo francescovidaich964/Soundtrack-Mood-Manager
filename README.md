@@ -13,6 +13,7 @@ sad / calm        →        happy / calm
 sad / energetic   →   happy / energetic
 ```
 
+
 ---
 
 ## How it works
@@ -21,6 +22,22 @@ sad / energetic   →   happy / energetic
 - **Phase 2 — Session** (your browser): reads `data.js`, authenticates via Spotify PKCE, plays music through the Spotify Web Playback SDK — no local server needed.
 
 > **Spotify Premium required** — the Web Playback SDK only works with Premium accounts.
+
+### Phase 1 - Updating the playlist
+
+Trigger **Actions → Sync Playlist → Run workflow** again. Only new tracks are downloaded and analyzed; existing ones are skipped.
+
+To force re-analysis of every track (e.g. after switching playlists), check **force_reanalyze** in the workflow inputs.
+
+### Phase 2 - Using the webapp
+
+1. Visit `https://<you>.github.io/Soundtrack-Mood-Manager/`
+2. Complete the Spotify login prompt (once per browser session).
+3. Drag the cursor on the **Mood Pad** to set the atmosphere:
+   - **X axis**: valence (left = sad / right = happy)
+   - **Y axis**: energy (bottom = calm / top = energetic)
+4. Press **▶** to start playing. The app picks a nearby track and auto-advances when each track ends.
+5. Press **⏭** to skip to the next track at the current mood.
 
 ---
 
@@ -130,27 +147,7 @@ The workflow will:
 4. Write `webapp/data.js` and `webapp/js/config.js`.
 5. Deploy `webapp/` to the `gh-pages` branch → GitHub Pages updates automatically.
 
-With a 50-track playlist, the first run takes **~25–30 minutes**. Subsequent runs only process new tracks (already-analyzed tracks are cached in `data.js`).
-
----
-
-## Using the webapp
-
-1. Visit `https://<you>.github.io/Soundtrack-Mood-Manager/`
-2. Complete the Spotify login prompt (once per browser session).
-3. Drag the cursor on the **Mood Pad** to set the atmosphere:
-   - **X axis**: valence (left = sad / right = happy)
-   - **Y axis**: energy (bottom = calm / top = energetic)
-4. Press **▶** to start playing. The app picks a nearby track and auto-advances when each track ends.
-5. Press **⏭** to skip to the next track at the current mood.
-
----
-
-## Updating the playlist
-
-Trigger **Actions → Sync Playlist → Run workflow** again. Only new tracks are downloaded and analyzed; existing ones are skipped.
-
-To force re-analysis of every track (e.g. after switching playlists), check **force_reanalyze** in the workflow inputs.
+With a 300-track playlist, the first run takes **~10 minutes**. Subsequent runs only process new tracks (already-analyzed tracks are cached in `data.js`).
 
 ---
 
