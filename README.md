@@ -1,6 +1,6 @@
 # DnD Soundtrack Manager
 
-A mood-driven music player for Dungeons & Dragons sessions. Drag a point on a 2D **valence × energy** canvas to set the atmosphere, and the app continuously picks tracks from your Spotify playlist that match the current mood.
+A mood-driven music player for Dungeons & Dragons sessions. Click a point on a 2D **valence × energy** canvas to set the atmosphere, and the app continuously picks tracks from your Spotify playlist that match the current mood. Scroll or pinch to zoom in on dense clusters of tracks.
 
 ```
 sad / calm        →        happy / calm
@@ -33,9 +33,13 @@ To force re-analysis of every track (e.g. after switching playlists), check **fo
 
 1. Visit `https://<you>.github.io/Soundtrack-Mood-Manager/`
 2. Complete the Spotify login prompt (once per browser session).
-3. Drag the cursor on the **Mood Pad** to set the atmosphere:
+3. Interact with the **Mood Pad** to set the atmosphere:
+   - **Click** anywhere to place the cursor at that mood position.
+   - **Drag** moves the cursor (at default zoom) or pans the view (when zoomed in).
+   - **Scroll wheel / trackpad pinch** zooms in toward the cursor; cannot zoom out past the default view.
    - **X axis**: valence (left = sad / right = happy)
    - **Y axis**: energy (bottom = calm / top = energetic)
+   - A **minimap** appears in the top-left corner when zoomed in, showing your position in the full mood space.
 4. Press **▶** to start playing. The app picks a nearby track and auto-advances when each track ends.
 5. Press **⏭** to skip to the next track at the current mood.
 
