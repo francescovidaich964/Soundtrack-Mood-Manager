@@ -3,7 +3,7 @@
 sync.py — Phase 1 of the DnD Soundtrack Manager
 
 Fetches a Spotify playlist, downloads 30-second preview clips, extracts
-valence/energy with Essentia, and writes the results to webapp/data.js.
+valence/energy with music2emo, and writes the results to webapp/data.js.
 Also generates webapp/js/config.js (contains clientId — not a secret).
 
 Credential resolution order:
@@ -194,7 +194,6 @@ def main() -> None:
         )
 
     webapp_dir = REPO_ROOT / "webapp"
-    models_dir = REPO_ROOT / "models"
     temp_base = Path(tempfile.gettempdir()) / "dnd_analysis"
     data_js_path = webapp_dir / "data.js"
     port = config.get("port", 8080)
@@ -267,7 +266,7 @@ def main() -> None:
                 continue
 
             # Analyze
-            result = analyze(mp3_path, models_dir)
+            result = analyze(mp3_path)
 
             # Clean up immediately — don't keep audio files on disk
             cleanup(temp_base / tid)

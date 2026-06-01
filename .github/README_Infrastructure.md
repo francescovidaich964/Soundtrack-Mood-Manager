@@ -31,7 +31,7 @@ Two workflows exist. They share the same deployment target (`gh-pages`) but serv
 
 **Trigger:** Push to any branch when files inside `webapp/` or `deploy.yml` itself change, or manually via `workflow_dispatch`.
 
-**Purpose:** Deploy source file changes (HTML/CSS/JS) to Pages quickly, without running the expensive Essentia sync.
+**Purpose:** Deploy source file changes (HTML/CSS/JS) to Pages quickly, without running the expensive music2emo sync.
 
 **What it does:**
 1. Checks out the source branch
@@ -52,12 +52,12 @@ Two workflows exist. They share the same deployment target (`gh-pages`) but serv
 - `playlist` — override the playlist ID at runtime without changing secrets
 - `force_reanalyze` — re-analyze all tracks even if already cached
 
-**Purpose:** Run the full Python sync pipeline (fetch Spotify metadata → download previews → Essentia analysis → write `data.js`).
+**Purpose:** Run the full Python sync pipeline (fetch Spotify metadata → download previews → music2emo analysis → write `data.js`).
 
 **What it does:**
 1. Determines deploy target and the correct `GITHUB_PAGES_URL` for the branch
 2. Restores `data.js` from `gh-pages` as an analysis cache — tracks already in `data.js` are skipped
-3. Caches Essentia `.pb` models and pip packages between runs
+3. Caches HuggingFace model weights and pip packages between runs
 4. Runs `sync.py` with Spotify secrets injected as environment variables
 5. Deploys the updated `webapp/` (including the new `data.js`) to `gh-pages`
 
@@ -132,7 +132,7 @@ Two independent caches, managed by `actions/cache@v4` in sync.yml:
 
 | Cache | Key | What it stores | Why |
 |-------|-----|----------------|-----|
-| Essentia models | `essentia-models-msd-musicnn-1-emomusic-msd-musicnn-2` | `models/*.pb` (~3 MB total) | Avoid re-downloading TF model files on every sync run |
+| music2emo weights | `music2emo-hf-cache-v1` | `~/.cache/huggingface/` | Avoid re-downloading model weights from HuggingFace on every sync run |
 | pip packages | `pip-<hash of requirements.txt>` | `~/.cache/pip` | Avoid re-downloading Python dependencies; key rotates when requirements.txt changes |
 
 These caches live in GitHub's cache storage (separate from the repo). They are scoped to the repository and shared across all branches and workflow runs.
