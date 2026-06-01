@@ -276,9 +276,9 @@ def main() -> None:
                 update_track(data_js_path, tid, {"analysis_failed": True})
                 continue
 
-            valence, energy = result
-            tqdm.write(f"  ✓  valence={valence:.3f}  energy={energy:.3f}")
-            update_track(data_js_path, tid, {"valence": valence, "energy": energy})
+            valence, energy, mood_tags = result
+            tqdm.write(f"  ✓  valence={valence:.3f}  energy={energy:.3f}  moods={mood_tags}")
+            update_track(data_js_path, tid, {"valence": valence, "energy": energy, "mood_tags": mood_tags})
 
         print(f"\ndata.js written: {data_js_path.relative_to(REPO_ROOT)}")
 
