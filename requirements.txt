@@ -4,10 +4,21 @@
 # Install:
 #   pip install -r requirements.txt
 #
-# music2emo downloads its model weights from HuggingFace automatically on first
-# use and caches them in ~/.cache/huggingface/.
+# On first run, snapshot_download fetches the full amaai-lab/music2emo repo
+# (~76 MB) and MERT-v1-95M weights (~378 MB) into ~/.cache/huggingface/.
 
 spotipy>=2.23.0
-music2emo
 numpy>=1.24.0
 tqdm>=4.0.0
+
+# music2emo inference dependencies (not on PyPI; loaded via snapshot_download)
+transformers      # MERT-v1-95M backbone
+torchaudio        # audio resampling and transforms
+soundfile>=0.12.0 # MP3/audio decoding via libsndfile 1.1+ (replaces torchcodec on Windows)
+librosa           # spectrogram features for chord detection
+mir_eval          # chord interval encoding
+pretty_midi       # MIDI generation for key detection
+music21           # key signature analysis
+hydra-core        # HParams config loader
+omegaconf         # config backend for hydra
+pytorch_lightning # .ckpt checkpoint loading
