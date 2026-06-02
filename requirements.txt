@@ -12,3 +12,4 @@ spotipy>=2.23.0
 essentia-tensorflow  # only dev wheels exist; no version pin
 numpy>=1.24.0
 tqdm>=4.0.0
+pyloudnorm>=0.1.1
