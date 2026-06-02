@@ -277,9 +277,13 @@ def main() -> None:
                 update_track(data_js_path, tid, {"analysis_failed": True})
                 continue
 
-            valence, energy = result
-            tqdm.write(f"  ✓  valence={valence:.3f}  energy={energy:.3f}")
-            update_track(data_js_path, tid, {"valence": valence, "energy": energy})
+            valence, energy, loudness_db = result
+            lufs_str = f"  loudness={loudness_db:.1f}dB" if loudness_db is not None else ""
+            tqdm.write(f"  ✓  valence={valence:.3f}  energy={energy:.3f}{lufs_str}")
+            fields: dict = {"valence": valence, "energy": energy}
+            if loudness_db is not None:
+                fields["loudness_db"] = loudness_db
+            update_track(data_js_path, tid, fields)
 
         print(f"\ndata.js written: {data_js_path.relative_to(REPO_ROOT)}")
 
