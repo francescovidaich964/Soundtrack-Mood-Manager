@@ -49,5 +49,6 @@ jobs:
             ${{ github.event_name == 'issue_comment' && format('User comment triggering this re-review: "{0}"', github.event.comment.body) || '' }}
             Follow all instructions in .claude/skills/review-pr.md.
           claude_args: |
+            --allowedTools Bash,Read,Glob,Grep
             --max-turns 30
             --model claude-opus-4-6
