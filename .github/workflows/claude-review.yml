@@ -1,0 +1,53 @@
+name: Claude PR Review
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review]
+  # Allow @claude mentions in PR comments for on-demand re-reviews
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  id-token: write
+
+jobs:
+  review:
+    name: Claude Code Review
+    runs-on: ubuntu-latest
+    # Run on PR events (skip drafts), or on @claude mentions in comments
+    if: |
+      (github.event_name == 'pull_request' && github.event.pull_request.draft == false) ||
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude'))
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Detect review mode
+        id: mode
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "type=initial" >> $GITHUB_OUTPUT
+            echo "pr=${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
+          else
+            echo "type=re-review" >> $GITHUB_OUTPUT
+            echo "pr=${{ github.event.issue.number }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run Claude Code Review
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Review PR #${{ steps.mode.outputs.pr }} in ${{ github.repository }}.
+            Review mode: ${{ steps.mode.outputs.type }}.
+            ${{ github.event_name == 'issue_comment' && format('User comment triggering this re-review: "{0}"', github.event.comment.body) || '' }}
+            Follow all instructions in .claude/skills/review-pr.md.
+          claude_args: |
+            --max-turns 30
+            --model claude-opus-4-6
