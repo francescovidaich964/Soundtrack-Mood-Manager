@@ -38,8 +38,9 @@ const Player = (() => {
   const _loudnessValues = (window.TRACK_DATA?.tracks ?? [])
     .map(t => t.loudness_db)
     .filter(v => v != null);
+  const _maxGain = Math.pow(10, (_TARGET_LUFS - Math.min(..._loudnessValues)) / 20);
   const _BASE_VOLUME = _loudnessValues.length > 0
-    ? Math.min(Math.pow(10, (_TARGET_LUFS - Math.min(..._loudnessValues)) / 20), 1.0)
+    ? Math.min(1.0 / _maxGain, 1.0)
     : 0.8;
 
   function _normalizedVolume(track) {
