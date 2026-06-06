@@ -168,13 +168,5 @@ const Player = (() => {
     }
   }
 
-  /**
-   * Call before issuing a manual playTrack() request so that the resulting
-   * paused→position:0 state change is not misread as a natural track end.
-   */
-  function resetPositionTracking() {
-    _previousPosition = 0;
-  }
-
-  return { init, waitForReady, getDeviceId, getCurrentState, pause, resume, togglePlayPause, resetPositionTracking };
+  return { init, waitForReady, getDeviceId, getCurrentState, pause, resume, togglePlayPause };
 })();

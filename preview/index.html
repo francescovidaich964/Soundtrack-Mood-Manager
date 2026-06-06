@@ -8,9 +8,6 @@
 </head>
 <body>
 
-  <!-- Preview banner — populated and shown by app.js when not on main -->
-  <div id="preview-banner" hidden></div>
-
   <!-- "No data" overlay — removed by ui.js if data.js has content -->
   <div id="no-data-overlay" class="overlay">
     <p>
@@ -71,8 +68,7 @@
     8. app.js (inline) — wires everything together
     9. Spotify SDK  — async so it doesn't block; triggers onSpotifyWebPlaybackSDKReady
   -->
-  <script defer src="data.js"></script>
-  <script defer src="js/build-info.js"></script>
+  <script defer src="data.js?v=20260606092228"></script>
   <script defer src="js/config.js"></script>
   <script defer src="js/auth.js"></script>
   <script defer src="js/spotify_api.js"></script>
@@ -87,24 +83,6 @@
        DOMContentLoaded is the correct way to wait for deferred scripts. -->
   <script>
     document.addEventListener('DOMContentLoaded', async () => {
-      // ---- 0. Preview banner ----
-      const _bi = window.BUILD_INFO;
-      if (_bi && _bi.deployBranch !== 'main') {
-        const _banner = document.getElementById('preview-banner');
-        if (_banner) {
-          const _td = window.TRACK_DATA;
-          const _syncBranch = _td?.sync_branch || null;
-          const _syncDate   = _td?.generated_at ? _td.generated_at.slice(0, 10) : null;
-
-          let _html = `webapp: <code>${_bi.deployBranch}</code>`;
-          if (_syncBranch) _html += ` &nbsp;·&nbsp; data: <code>${_syncBranch}</code>`;
-          if (_syncDate)   _html += ` &nbsp;·&nbsp; ${_syncDate}`;
-
-          _banner.innerHTML = _html;
-          _banner.hidden = false;
-        }
-      }
-
       // ---- 1. Auth ----
       // May redirect to Spotify login and return via the PKCE callback.
       // If redirecting, execution stops here for this page load.
@@ -149,7 +127,6 @@
             const pt = UI.getCurrentPoint();
             const track = selector.pickNext(pt.x, pt.y);
             if (track) {
-              Player.resetPositionTracking();
               await SpotifyAPI.playTrack(deviceId, track.uri);
               isPlaying = true;
             }
@@ -166,9 +143,6 @@
           const pt = UI.getCurrentPoint();
           const track = selector.pickNext(pt.x, pt.y);
           if (track) {
-            // Reset before the API call so the resulting state change
-            // (paused:true, position:0) is not misread as a natural track end.
-            Player.resetPositionTracking();
             await SpotifyAPI.playTrack(deviceId, track.uri);
             isPlaying = true;
           }
@@ -197,7 +171,6 @@
           const pt = UI.getCurrentPoint();
           const track = selector.pickNext(pt.x, pt.y);
           if (track && deviceId) {
-            Player.resetPositionTracking();
             await SpotifyAPI.playTrack(deviceId, track.uri);
           }
         },
