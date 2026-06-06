@@ -58,36 +58,38 @@ _DEAM_URLS = {
 }
 
 
-def setup_deam(data_dir: Path) -> tuple:
-    """Load DEAM annotations; download zips if not already present.
+def setup_deam(data_dir: Path, download_audio: bool = True) -> tuple:
+    """Load DEAM annotations and optionally download audio from the official source.
 
     Zip structure (after extraction):
-      DEAM_audio.zip        → MEMD_audio/<song_id>.mp3
+      DEAM_audio.zip        → MEMD_audio/<song_id>.mp3   (1802 files, 1.3 GB)
       DEAM_Annotations.zip  → annotations/annotations averaged per song/song_level/
                                static_annotations_averaged_songs_1_2000.csv
                                static_annotations_averaged_songs_2000_2058.csv
 
     Annotation columns: song_id, valence_mean, arousal_mean  (scale 1–9)
-
-    Audio is NOT downloaded automatically — only annotations are fetched.
-    Place DEAM_audio.zip in <data_dir>/deam/ and re-run to extract audio.
+    Official download page: https://cvml.unige.ch/databases/DEAM/
     """
     deam_dir = Path(data_dir) / "deam"
     deam_dir.mkdir(parents=True, exist_ok=True)
 
-    # Download annotations zip if not present (small, 4.7 MB)
-    annot_zip = deam_dir / "DEAM_Annotations.zip"
-    if not annot_zip.exists():
-        url = _DEAM_URLS["DEAM_Annotations.zip"]
-        print(f"Downloading DEAM annotations from {url}")
-        try:
-            _download(url, annot_zip, "DEAM_Annotations.zip")
-        except requests.HTTPError as e:
-            print(f"  ⚠  Download failed ({e.response.status_code}).")
-            print(f"     Download manually from https://cvml.unige.ch/databases/DEAM/")
-            print(f"     Place DEAM_Annotations.zip in {deam_dir}/ and re-run.")
+    files_to_download = {"DEAM_Annotations.zip"}
+    if download_audio:
+        files_to_download.add("DEAM_audio.zip")
 
-    # Extract any unextracted zips (annotations + audio if present)
+    for name in files_to_download:
+        dest = deam_dir / name
+        if dest.exists():
+            print(f"  ✓ {name} (cached)")
+            continue
+        try:
+            _download(_DEAM_URLS[name], dest, name)
+        except requests.HTTPError as e:
+            print(f"  ⚠  Download failed ({e.response.status_code}): {name}")
+            print(f"     Get it from https://cvml.unige.ch/databases/DEAM/")
+            dest.unlink(missing_ok=True)
+
+    # Extract any downloaded zips that haven't been extracted yet
     _extract_zips(deam_dir)
 
     # Merge both static annotation CSVs (songs 1-2000 and 2000-2058)
@@ -201,34 +203,39 @@ _MERGE_AUDIO_FILE  = "MERGE_Audio_Complete.zip"   # 1.2 GB, 3554 clips
 _MERGE_ANNOT_FILE  = "MERGE_Audio_Complete.zip"   # annotations are bundled inside
 
 
-def setup_merge(data_dir: Path) -> tuple:
+def setup_merge(data_dir: Path, download_audio: bool = True) -> tuple:
     """Download MERGE dataset from Zenodo; return (df, id_col, val_col, aro_col).
 
     MERGE has 3,554 30-second audio clips with continuous valence and arousal
-    annotations (scale 0–1) from AllMusic, plus Russell quadrant labels.
+    annotations (scale 0–1) plus Russell quadrant labels.
     Zenodo record: https://zenodo.org/records/13939205
-
-    Audio is NOT downloaded automatically (1.2 GB).
-    Run the download cell below when ready.
+    Audio zip: MERGE_Audio_Complete.zip (1.2 GB)
     """
     merge_dir = Path(data_dir) / "merge"
     merge_dir.mkdir(parents=True, exist_ok=True)
 
-    # Locate annotation CSV (bundled inside the audio zip after extraction)
+    audio_zip = merge_dir / _MERGE_AUDIO_FILE
+    if download_audio and not audio_zip.exists():
+        url = f"https://zenodo.org/records/{_MERGE_ZENODO}/files/{_MERGE_AUDIO_FILE}?download=1"
+        try:
+            _download(url, audio_zip, _MERGE_AUDIO_FILE)
+        except requests.HTTPError as e:
+            print(f"  ⚠  Download failed ({e.response.status_code}): {_MERGE_AUDIO_FILE}")
+            print(f"     Get it from https://zenodo.org/records/{_MERGE_ZENODO}")
+            audio_zip.unlink(missing_ok=True)
+
+    if audio_zip.exists():
+        _extract_zips(merge_dir)
+
+    # Locate annotation CSV bundled inside the zip
     annot_candidates = sorted(merge_dir.rglob("*.csv"))
-    # Prefer files that mention 'metadata' or 'annotation' in their name
     scored = sorted(annot_candidates, key=lambda p: (
         "metadata" in p.name.lower() or "annot" in p.name.lower()
     ), reverse=True)
 
     if not scored:
-        print("⚠  MERGE annotations not found.")
-        print(f"   Download MERGE_Audio_Complete.zip from https://zenodo.org/records/{_MERGE_ZENODO}")
-        print(f"   Place it in {merge_dir}/ and re-run this cell.")
-        print()
-        print("   To download automatically, run:")
-        print(f"   url = 'https://zenodo.org/records/{_MERGE_ZENODO}/files/{_MERGE_AUDIO_FILE}?download=1'")
-        print(f"   !wget -q --show-progress -O data/merge/{_MERGE_AUDIO_FILE} {{url}}")
+        print("⚠  MERGE annotations not found after extraction.")
+        print(f"   Expected {_MERGE_AUDIO_FILE} to contain a metadata/annotation CSV.")
         return None, None, None, None
 
     df = pd.read_csv(scored[0])
