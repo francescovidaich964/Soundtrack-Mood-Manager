@@ -111,17 +111,31 @@ def run_evaluation(
         DataFrame with columns:
           model, dataset, song_id, gt_valence, gt_arousal, valence, arousal
     """
+    def _norm(val) -> str:
+        """Normalise an ID to a plain string.
+
+        Handles the common pandas gotcha where an int column (song_id=2) gets
+        silently upcast to float after pd.concat, making str() return "2.0"
+        instead of "2" and breaking the match with audio stem "2".
+        String IDs like "MT0000040632" pass through unchanged.
+        """
+        s = str(val).strip()
+        try:
+            return str(int(float(s)))
+        except (ValueError, TypeError):
+            return s
+
     # Build {stem → path} map with recursive search so nested layouts (e.g. Q1/Q2/Q3/Q4)
     # are handled the same as flat directories.
-    audio_map = {p.stem: p for p in sorted(Path(audio_dir).rglob("*.mp3"))}
+    audio_map = {_norm(p.stem): p for p in sorted(Path(audio_dir).rglob("*.mp3"))}
     if not audio_map:
         print(f"  ⚠  No .mp3 files found under {audio_dir}")
         return pd.DataFrame()
 
-    # Build annotation lookup keyed on string ID for O(1) access
+    # Build annotation lookup; normalise keys the same way as audio stems
     annot_lookup: dict[str, tuple[float, float]] = {}
     for _, row in df_annot.iterrows():
-        key = str(row[id_col]).strip()
+        key = _norm(row[id_col])
         annot_lookup[key] = (float(row[val_col]), float(row[aro_col]))
 
     items = list(audio_map.items())
