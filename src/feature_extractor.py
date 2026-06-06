@@ -22,6 +22,7 @@ initialization and to produce a clear error if the .pb files are missing.
 
 from __future__ import annotations
 
+import math
 import warnings
 from pathlib import Path
 
@@ -129,6 +130,12 @@ def analyze(audio_path: Path, models_dir: Path) -> tuple[float, float] | None:
         # 5. Normalize from EmoMusic scale [1, 9] → [0, 1] and clip.
         valence = float(np.clip((mean[0] - 1.0) / 8.0, 0.0, 1.0))
         energy = float(np.clip((mean[1] - 1.0) / 8.0, 0.0, 1.0))
+
+        # np.clip does not sanitise NaN; guard so callers never store NaN in data.js.
+        # (json.dumps writes float('nan') as the bare JS token NaN, which then passes
+        # typeof checks but draws at (NaN, NaN) — invisible on the canvas.)
+        if not (math.isfinite(valence) and math.isfinite(energy)):
+            return None
 
         return valence, energy
 
