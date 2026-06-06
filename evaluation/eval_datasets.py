@@ -4,9 +4,9 @@ Each setup_*() returns (df, id_col, val_col, aro_col) on success,
 or (None, None, None, None) if the dataset is not available.
 
 Ground-truth annotation scales:
-  DEAM:     1–9  (normalised to [0, 1] inside run_evaluation in spot_checks.py)
-  EmoMusic: 1–9  (same)
-  PMEmo:    0–1  (already normalised — no conversion needed)
+  DEAM:  1–9  (normalised to [0, 1] inside run_evaluation in spot_checks.py)
+  PMEmo: 0–1  (already normalised — no conversion needed)
+  MERGE: 0–1  (continuous valence/arousal, already normalised)
 """
 
 from __future__ import annotations
@@ -33,18 +33,12 @@ def _download(url: str, dest: Path, label: str = "", timeout: int = 120) -> None
     print(f"{dest.stat().st_size / 1e6:.1f} MB")
 
 
-def _best_annot_csv(root: Path) -> Path | None:
-    """Return the annotation CSV most likely to be the static per-song annotations."""
-    csvs = list(root.rglob("*.csv"))
-    if not csvs:
-        return None
-    keywords = ("static", "averaged", "song")
-
-    def score(p: Path) -> int:
-        n = p.name.lower()
-        return sum(k in n for k in keywords)
-
-    return sorted(csvs, key=score, reverse=True)[0]
+def _extract_zips(directory: Path) -> None:
+    """Extract all .zip files found directly under directory."""
+    for zip_path in sorted(directory.glob("*.zip")):
+        print(f"Extracting {zip_path.name}...")
+        with zipfile.ZipFile(zip_path) as z:
+            z.extractall(directory)
 
 
 def _detect_columns(df: pd.DataFrame) -> tuple[str, str | None, str | None]:
@@ -57,84 +51,88 @@ def _detect_columns(df: pd.DataFrame) -> tuple[str, str | None, str | None]:
 
 # ── DEAM ─────────────────────────────────────────────────────────────────────
 
-_DEAM_ZENODO = "11400122"
+# Official download page: https://cvml.unige.ch/databases/DEAM/
+_DEAM_URLS = {
+    "DEAM_Annotations.zip": "https://cvml.unige.ch/databases/DEAM/DEAM_Annotations.zip",
+    "DEAM_audio.zip":       "https://cvml.unige.ch/databases/DEAM/DEAM_audio.zip",
+}
 
 
 def setup_deam(data_dir: Path) -> tuple:
-    """Download DEAM annotations from Zenodo; return (df, id_col, val_col, aro_col).
+    """Load DEAM annotations; download zips if not already present.
 
-    Audio (~4 GB) is NOT downloaded automatically.
-    Place .mp3 files (named by song_id) in <data_dir>/deam/audio/ to enable evaluation.
+    Zip structure (after extraction):
+      DEAM_audio.zip        → MEMD_audio/<song_id>.mp3
+      DEAM_Annotations.zip  → annotations/annotations averaged per song/song_level/
+                               static_annotations_averaged_songs_1_2000.csv
+                               static_annotations_averaged_songs_2000_2058.csv
+
+    Annotation columns: song_id, valence_mean, arousal_mean  (scale 1–9)
+
+    Audio is NOT downloaded automatically — only annotations are fetched.
+    Place DEAM_audio.zip in <data_dir>/deam/ and re-run to extract audio.
     """
     deam_dir = Path(data_dir) / "deam"
     deam_dir.mkdir(parents=True, exist_ok=True)
 
-    resp = requests.get(f"https://zenodo.org/api/records/{_DEAM_ZENODO}")
-    if resp.status_code != 200 or not resp.text.strip():
-        print(f"⚠  Zenodo API returned {resp.status_code} (possibly rate-limited or down).")
-        print(f"   Download annotations manually from https://zenodo.org/records/{_DEAM_ZENODO}")
-        print(f"   Then place them in {deam_dir}/ and re-run this cell.")
-        return None, None, None, None
-    meta = resp.json()
-    print(f"DEAM — {meta.get('metadata', {}).get('title', 'Zenodo record')}")
-
-    for f in meta.get("files", []):
-        name, size_mb = f["key"], f["size"] / 1e6
-        dest = deam_dir / name
-        if dest.exists():
-            print(f"  ✓ {name} (cached)")
-            continue
-        if size_mb > 20:
-            print(f"  [skipped — {size_mb:.0f} MB] {name}")
-            continue
-        url = f"https://zenodo.org/records/{_DEAM_ZENODO}/files/{name}?download=1"
+    # Download annotations zip if not present (small, 4.7 MB)
+    annot_zip = deam_dir / "DEAM_Annotations.zip"
+    if not annot_zip.exists():
+        url = _DEAM_URLS["DEAM_Annotations.zip"]
+        print(f"Downloading DEAM annotations from {url}")
         try:
-            _download(url, dest, name)
+            _download(url, annot_zip, "DEAM_Annotations.zip")
         except requests.HTTPError as e:
-            print(f"\n  ⚠  Download failed ({e.response.status_code}): {name}")
-            print(f"     Download manually: {url}")
-            dest.unlink(missing_ok=True)  # remove partial file
-            continue
-        if name.endswith(".zip"):
-            with zipfile.ZipFile(dest) as z:
-                z.extractall(deam_dir)
+            print(f"  ⚠  Download failed ({e.response.status_code}).")
+            print(f"     Download manually from https://cvml.unige.ch/databases/DEAM/")
+            print(f"     Place DEAM_Annotations.zip in {deam_dir}/ and re-run.")
 
-    csv_path = _best_annot_csv(deam_dir)
-    if csv_path is None:
-        print(f"⚠  No annotation CSVs found. Download DEAM_Annotations.zip manually:")
-        print(f"   https://zenodo.org/records/{_DEAM_ZENODO}")
-        print(f"   Extract into {deam_dir}/ and re-run this cell.")
+    # Extract any unextracted zips (annotations + audio if present)
+    _extract_zips(deam_dir)
+
+    # Merge both static annotation CSVs (songs 1-2000 and 2000-2058)
+    annot_csvs = sorted(deam_dir.rglob("static_annotations_averaged_songs_*.csv"))
+    if not annot_csvs:
+        print("⚠  No DEAM annotation CSVs found.")
+        print(f"   Place DEAM_Annotations.zip in {deam_dir}/ and re-run this cell.")
         return None, None, None, None
 
-    df = pd.read_csv(csv_path)
-    id_col, val_col, aro_col = _detect_columns(df)
-    print(f"  loaded {csv_path.name}  ({len(df)} rows)  "
-          f"id={id_col!r}  valence={val_col!r}  arousal={aro_col!r}")
+    parts = []
+    for p in annot_csvs:
+        df = pd.read_csv(p)
+        df.columns = df.columns.str.strip()  # column names have leading spaces in the raw files
+        parts.append(df)
+    df = pd.concat(parts, ignore_index=True)
+
+    # Use known stable column names; fall back to detection if they differ
+    id_col  = "song_id"      if "song_id"      in df.columns else df.columns[0]
+    val_col = "valence_mean" if "valence_mean"  in df.columns else next((c for c in df.columns if "valence" in c.lower()), None)
+    aro_col = "arousal_mean" if "arousal_mean"  in df.columns else next((c for c in df.columns if "arousal" in c.lower()), None)
+
+    print(f"DEAM: {len(df)} songs  id={id_col!r}  valence={val_col!r}  arousal={aro_col!r}")
     return df, id_col, val_col, aro_col
 
 
 # ── EmoMusic ─────────────────────────────────────────────────────────────────
 
 def setup_emomusic(data_dir: Path) -> tuple:
-    """Load EmoMusic annotations if present; print access instructions otherwise.
+    """EmoMusic — currently unavailable (official links return 404 as of 2025-06).
 
-    EmoMusic requires a form request at https://cvml.unige.ch/databases/emoMusic/
-    Expected layout after extraction:
+    If you have a local copy, place it as:
       <data_dir>/emomusic/clips/          — .mp3 files named by song_id
       <data_dir>/emomusic/annotations.csv — columns: <id>, valence, arousal (scale 1–9)
     """
     emo_dir = Path(data_dir) / "emomusic"
-    annot = emo_dir / "annotations.csv"
+    annot   = emo_dir / "annotations.csv"
 
     if not annot.exists():
-        print("⚠  EmoMusic not found. To enable:")
-        print("   1. Request at https://cvml.unige.ch/databases/emoMusic/")
-        print("   2. Extract audio to  <data_dir>/emomusic/clips/  (files: <id>.mp3)")
-        print("   3. Place annotations: <data_dir>/emomusic/annotations.csv")
-        print("      Expected columns: <song_id>, valence, arousal  (scale 1–9)")
+        print("⚠  EmoMusic unavailable — official download links return 404 (as of 2025-06).")
+        print("   If you have a local copy, place annotations.csv in data/emomusic/")
+        print("   and audio .mp3 files in data/emomusic/clips/")
         return None, None, None, None
 
     df = pd.read_csv(annot)
+    df.columns = df.columns.str.strip()
     id_col, val_col, aro_col = _detect_columns(df)
     print(f"EmoMusic: {len(df)} rows  id={id_col!r}  valence={val_col!r}  arousal={aro_col!r}")
     return df, id_col, val_col, aro_col
@@ -149,7 +147,7 @@ def setup_pmemo(data_dir: Path) -> tuple:
     """Download PMEmo from Google Drive via gdown; return (df, id_col, val_col, aro_col).
 
     Annotation scale is 0–1 (already normalised — no conversion applied).
-    Audio lives in the 'chorus' subfolder.
+    Audio lives in the chorus/ subfolder inside the extracted zip.
     """
     pmemo_dir = Path(data_dir) / "pmemo"
     pmemo_dir.mkdir(parents=True, exist_ok=True)
@@ -169,11 +167,8 @@ def setup_pmemo(data_dir: Path) -> tuple:
             except Exception as e:
                 print(f"  gdown failed: {e}")
 
-        # gdown downloads the folder contents as files (including zips); extract them.
-        for zip_path in sorted(pmemo_dir.rglob("*.zip")):
-            print(f"Extracting {zip_path.name}...")
-            with zipfile.ZipFile(zip_path) as z:
-                z.extractall(pmemo_dir)
+        # gdown downloads files as-is (including zips) — extract them
+        _extract_zips(pmemo_dir)
 
         candidates = sorted(pmemo_dir.rglob("static_annotations.csv"))
         if candidates:
@@ -187,6 +182,7 @@ def setup_pmemo(data_dir: Path) -> tuple:
         return None, None, None, None
 
     df = pd.read_csv(annot)
+    df.columns = df.columns.str.strip()
     # PMEmo uses 'musicId' as the track identifier
     id_col = next(
         (c for c in df.columns if "music" in c.lower() or c.lower() == "id"),
@@ -194,4 +190,51 @@ def setup_pmemo(data_dir: Path) -> tuple:
     )
     _, val_col, aro_col = _detect_columns(df)
     print(f"PMEmo: {len(df)} rows  id={id_col!r}  valence={val_col!r}  arousal={aro_col!r}")
+    return df, id_col, val_col, aro_col
+
+
+# ── MERGE ─────────────────────────────────────────────────────────────────────
+
+# Zenodo record: https://zenodo.org/records/13939205
+_MERGE_ZENODO = "13939205"
+_MERGE_AUDIO_FILE  = "MERGE_Audio_Complete.zip"   # 1.2 GB, 3554 clips
+_MERGE_ANNOT_FILE  = "MERGE_Audio_Complete.zip"   # annotations are bundled inside
+
+
+def setup_merge(data_dir: Path) -> tuple:
+    """Download MERGE dataset from Zenodo; return (df, id_col, val_col, aro_col).
+
+    MERGE has 3,554 30-second audio clips with continuous valence and arousal
+    annotations (scale 0–1) from AllMusic, plus Russell quadrant labels.
+    Zenodo record: https://zenodo.org/records/13939205
+
+    Audio is NOT downloaded automatically (1.2 GB).
+    Run the download cell below when ready.
+    """
+    merge_dir = Path(data_dir) / "merge"
+    merge_dir.mkdir(parents=True, exist_ok=True)
+
+    # Locate annotation CSV (bundled inside the audio zip after extraction)
+    annot_candidates = sorted(merge_dir.rglob("*.csv"))
+    # Prefer files that mention 'metadata' or 'annotation' in their name
+    scored = sorted(annot_candidates, key=lambda p: (
+        "metadata" in p.name.lower() or "annot" in p.name.lower()
+    ), reverse=True)
+
+    if not scored:
+        print("⚠  MERGE annotations not found.")
+        print(f"   Download MERGE_Audio_Complete.zip from https://zenodo.org/records/{_MERGE_ZENODO}")
+        print(f"   Place it in {merge_dir}/ and re-run this cell.")
+        print()
+        print("   To download automatically, run:")
+        print(f"   url = 'https://zenodo.org/records/{_MERGE_ZENODO}/files/{_MERGE_AUDIO_FILE}?download=1'")
+        print(f"   !wget -q --show-progress -O data/merge/{_MERGE_AUDIO_FILE} {{url}}")
+        return None, None, None, None
+
+    df = pd.read_csv(scored[0])
+    df.columns = df.columns.str.strip()
+
+    id_col, val_col, aro_col = _detect_columns(df)
+    print(f"MERGE: {len(df)} rows  id={id_col!r}  valence={val_col!r}  arousal={aro_col!r}")
+    print(f"  (loaded from {scored[0].relative_to(merge_dir)})")
     return df, id_col, val_col, aro_col
