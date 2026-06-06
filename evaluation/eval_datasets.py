@@ -169,6 +169,12 @@ def setup_pmemo(data_dir: Path) -> tuple:
             except Exception as e:
                 print(f"  gdown failed: {e}")
 
+        # gdown downloads the folder contents as files (including zips); extract them.
+        for zip_path in sorted(pmemo_dir.rglob("*.zip")):
+            print(f"Extracting {zip_path.name}...")
+            with zipfile.ZipFile(zip_path) as z:
+                z.extractall(pmemo_dir)
+
         candidates = sorted(pmemo_dir.rglob("static_annotations.csv"))
         if candidates:
             annot = candidates[0]
