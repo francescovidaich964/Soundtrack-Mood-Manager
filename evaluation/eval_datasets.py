@@ -198,18 +198,19 @@ def setup_pmemo(data_dir: Path) -> tuple:
 # ── MERGE ─────────────────────────────────────────────────────────────────────
 
 # Zenodo record: https://zenodo.org/records/13939205
-_MERGE_ZENODO = "13939205"
-_MERGE_AUDIO_FILE  = "MERGE_Audio_Complete.zip"   # 1.2 GB, 3554 clips
-_MERGE_ANNOT_FILE  = "MERGE_Audio_Complete.zip"   # annotations are bundled inside
+_MERGE_ZENODO    = "13939205"
+_MERGE_AUDIO_FILE = "MERGE_Audio_Balanced.zip"   # 1.1 GB, 3232 clips
+# Audio is organised into quadrant subdirs: Q1/ Q2/ Q3/ Q4/
+# Annotation file bundled inside the zip: merge_audio_balanced_av_values.csv
+#   Columns: Song (string ID), Arousal (0-1), Valence (0-1)
 
 
 def setup_merge(data_dir: Path, download_audio: bool = True) -> tuple:
-    """Download MERGE dataset from Zenodo; return (df, id_col, val_col, aro_col).
+    """Download MERGE (Balanced) from Zenodo; return (df, id_col, val_col, aro_col).
 
-    MERGE has 3,554 30-second audio clips with continuous valence and arousal
-    annotations (scale 0–1) plus Russell quadrant labels.
+    MERGE has 3,232 30-second audio clips with continuous valence/arousal (scale 0–1).
+    Audio is organised in Q1/Q2/Q3/Q4 subdirectories inside the zip.
     Zenodo record: https://zenodo.org/records/13939205
-    Audio zip: MERGE_Audio_Complete.zip (1.2 GB)
     """
     merge_dir = Path(data_dir) / "merge"
     merge_dir.mkdir(parents=True, exist_ok=True)
@@ -227,21 +228,18 @@ def setup_merge(data_dir: Path, download_audio: bool = True) -> tuple:
     if audio_zip.exists():
         _extract_zips(merge_dir)
 
-    # Locate annotation CSV bundled inside the zip
-    annot_candidates = sorted(merge_dir.rglob("*.csv"))
-    scored = sorted(annot_candidates, key=lambda p: (
-        "metadata" in p.name.lower() or "annot" in p.name.lower()
-    ), reverse=True)
-
-    if not scored:
-        print("⚠  MERGE annotations not found after extraction.")
-        print(f"   Expected {_MERGE_AUDIO_FILE} to contain a metadata/annotation CSV.")
+    # The av_values CSV has the continuous valence/arousal we need
+    annot_path = next(iter(sorted(merge_dir.rglob("merge_audio_balanced_av_values.csv"))), None)
+    if annot_path is None:
+        print("⚠  MERGE annotation CSV not found after extraction.")
+        print(f"   Expected merge_audio_balanced_av_values.csv inside {_MERGE_AUDIO_FILE}.")
         return None, None, None, None
 
-    df = pd.read_csv(scored[0])
+    df = pd.read_csv(annot_path)
     df.columns = df.columns.str.strip()
-
-    id_col, val_col, aro_col = _detect_columns(df)
+    # Known columns: Song, Arousal, Valence (scale 0-1, already normalised)
+    id_col  = "Song"
+    val_col = "Valence"
+    aro_col = "Arousal"
     print(f"MERGE: {len(df)} rows  id={id_col!r}  valence={val_col!r}  arousal={aro_col!r}")
-    print(f"  (loaded from {scored[0].relative_to(merge_dir)})")
     return df, id_col, val_col, aro_col

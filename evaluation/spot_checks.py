@@ -99,9 +99,10 @@ def run_evaluation(
         dataset_name: Label stored in the 'dataset' column (e.g. 'DEAM').
         model_name:   Label stored in the 'model' column (e.g. 'essentia').
         predictor_fn: Callable(audio_path) → {"valence": float, "arousal": float} | None.
-        audio_dir:    Directory containing .mp3 files named by integer song_id.
+        audio_dir:    Root directory to search for .mp3 files (recursively).
+                      Files can be in subdirectories (e.g. MERGE's Q1/Q2/Q3/Q4 layout).
         df_annot:     Annotation DataFrame.
-        id_col:       Column with the song identifier.
+        id_col:       Column with the song identifier (int or string).
         val_col:      Column with ground-truth valence.
         aro_col:      Column with ground-truth arousal.
         max_tracks:   Cap on tracks to evaluate (None = all).
@@ -110,26 +111,29 @@ def run_evaluation(
         DataFrame with columns:
           model, dataset, song_id, gt_valence, gt_arousal, valence, arousal
     """
-    audio_files = sorted(Path(audio_dir).glob("*.mp3"))
-    if max_tracks:
-        audio_files = audio_files[:max_tracks]
-    if not audio_files:
-        print(f"  ⚠  No .mp3 files found in {audio_dir}")
+    # Build {stem → path} map with recursive search so nested layouts (e.g. Q1/Q2/Q3/Q4)
+    # are handled the same as flat directories.
+    audio_map = {p.stem: p for p in sorted(Path(audio_dir).rglob("*.mp3"))}
+    if not audio_map:
+        print(f"  ⚠  No .mp3 files found under {audio_dir}")
         return pd.DataFrame()
 
+    # Build annotation lookup keyed on string ID for O(1) access
+    annot_lookup: dict[str, tuple[float, float]] = {}
+    for _, row in df_annot.iterrows():
+        key = str(row[id_col]).strip()
+        annot_lookup[key] = (float(row[val_col]), float(row[aro_col]))
+
+    items = list(audio_map.items())
+    if max_tracks:
+        items = items[:max_tracks]
+
     records = []
-    for audio_path in tqdm(audio_files, desc=f"{dataset_name} / {model_name}"):
-        try:
-            song_id = int(audio_path.stem)
-        except ValueError:
+    for stem, audio_path in tqdm(items, desc=f"{dataset_name} / {model_name}"):
+        if stem not in annot_lookup:
             continue
 
-        row = df_annot[df_annot[id_col] == song_id]
-        if row.empty:
-            continue
-
-        gt_v = float(row[val_col].iloc[0])
-        gt_a = float(row[aro_col].iloc[0])
+        gt_v, gt_a = annot_lookup[stem]
 
         # Normalise [1, 9] → [0, 1] for DEAM and EmoMusic; PMEmo is already [0, 1]
         if gt_v > 1.5 or gt_a > 1.5:
@@ -140,7 +144,7 @@ def run_evaluation(
         records.append({
             "model":      model_name,
             "dataset":    dataset_name,
-            "song_id":    song_id,
+            "song_id":    stem,
             "gt_valence": gt_v,
             "gt_arousal": gt_a,
             "valence":    pred["valence"] if pred else float("nan"),
