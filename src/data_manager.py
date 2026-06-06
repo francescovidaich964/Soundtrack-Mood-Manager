@@ -58,6 +58,7 @@ def write_data_js(
     playlist_name: str,
     playlist_id: str,
     tracks: list[dict],
+    sync_branch: str = "",
 ) -> str:
     """Serialize the full track list and write data.js.
 
@@ -76,6 +77,7 @@ def write_data_js(
         "playlist_name": playlist_name,
         "playlist_id": playlist_id,
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "sync_branch": sync_branch,
         "tracks": tracks,
     }
 

@@ -236,7 +236,8 @@ def main() -> None:
         else:
             tracks_to_write.append(t)  # valence/energy to be filled in below
 
-    generated_at = write_data_js(data_js_path, playlist_name, playlist_id, tracks_to_write)
+    sync_branch = os.environ.get("GITHUB_REF_NAME", "")
+    generated_at = write_data_js(data_js_path, playlist_name, playlist_id, tracks_to_write, sync_branch=sync_branch)
     _update_data_version(webapp_dir, generated_at)
 
     # ------------------------------------------------------------------
