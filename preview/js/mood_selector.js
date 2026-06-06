@@ -20,8 +20,10 @@ class MoodSelector {
    */
   constructor(tracks) {
     // Only include tracks that were successfully analyzed.
+    // Number.isFinite rejects NaN and Infinity in addition to non-numbers.
+    // typeof NaN === "number" is true, so a plain typeof check is insufficient.
     this._tracks = tracks.filter(
-      t => typeof t.valence === "number" && typeof t.energy === "number"
+      t => Number.isFinite(t.valence) && Number.isFinite(t.energy)
     );
     this._lastX = null;           // last cursor x (valence)
     this._lastY = null;           // last cursor y (energy)

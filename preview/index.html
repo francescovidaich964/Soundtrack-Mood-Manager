@@ -127,7 +127,7 @@
             const pt = UI.getCurrentPoint();
             const track = selector.pickNext(pt.x, pt.y);
             if (track) {
-              await Player.setTrackVolume(track);
+              Player.resetPositionTracking();
               await SpotifyAPI.playTrack(deviceId, track.uri);
               isPlaying = true;
             }
@@ -144,7 +144,9 @@
           const pt = UI.getCurrentPoint();
           const track = selector.pickNext(pt.x, pt.y);
           if (track) {
-            await Player.setTrackVolume(track);
+            // Reset before the API call so the resulting state change
+            // (paused:true, position:0) is not misread as a natural track end.
+            Player.resetPositionTracking();
             await SpotifyAPI.playTrack(deviceId, track.uri);
             isPlaying = true;
           }
@@ -173,7 +175,7 @@
           const pt = UI.getCurrentPoint();
           const track = selector.pickNext(pt.x, pt.y);
           if (track && deviceId) {
-            await Player.setTrackVolume(track);
+            Player.resetPositionTracking();
             await SpotifyAPI.playTrack(deviceId, track.uri);
           }
         },
