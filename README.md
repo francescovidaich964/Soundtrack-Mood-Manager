@@ -207,6 +207,19 @@ python sync.py --local
 
 ---
 
+## Benchmarks
+
+Two Colab-ready notebooks in [`evaluation/`](evaluation/), each running in its own isolated runtime to avoid the numpy version conflict between Essentia and music2emo:
+
+| Notebook | Model | Install |
+|----------|-------|---------|
+| [`01_essentia_benchmark.ipynb`](evaluation/01_essentia_benchmark.ipynb) | Essentia EmoMusic (production) | `essentia-tensorflow` |
+| [`02_music2emo_benchmark.ipynb`](evaluation/02_music2emo_benchmark.ipynb) | [music2emo](https://github.com/AMAAI-Lab/Music2Emotion) | PyTorch + MERT |
+
+Datasets covered: DEAM, EmoMusic, PMEmo. Metrics: MAE, R², Pearson r. Shared utilities live in `evaluation/datasets.py`, `metrics.py`, `visualization.py`, `spot_checks.py`.
+
+---
+
 ## Troubleshooting
 
 | Problem | Fix |

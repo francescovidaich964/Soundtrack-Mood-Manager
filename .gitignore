@@ -26,8 +26,13 @@ models/*.pb
 # Temp download dir
 /tmp/
 
-# Evaluation data (large datasets — download separately)
+# Evaluation notebooks — large dataset/audio files and generated artefacts
 evaluation/data/
+evaluation/models/
+evaluation/spotchecks/
+evaluation/*.png
+evaluation/*.csv
+evaluation/Music2Emotion/
 
 # OS
 .DS_Store
