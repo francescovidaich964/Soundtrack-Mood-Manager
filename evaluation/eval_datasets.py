@@ -21,10 +21,10 @@ import requests
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
-def _download(url: str, dest: Path, label: str = "") -> None:
+def _download(url: str, dest: Path, label: str = "", timeout: int = 120) -> None:
     """Stream-download url to dest."""
     print(f"Downloading {label or dest.name}...", end=" ", flush=True)
-    r = requests.get(url, stream=True)
+    r = requests.get(url, stream=True, timeout=timeout)
     r.raise_for_status()
     dest.parent.mkdir(parents=True, exist_ok=True)
     with open(dest, "wb") as f:
@@ -88,14 +88,22 @@ def setup_deam(data_dir: Path) -> tuple:
             print(f"  [skipped — {size_mb:.0f} MB] {name}")
             continue
         url = f"https://zenodo.org/records/{_DEAM_ZENODO}/files/{name}?download=1"
-        _download(url, dest, name)
+        try:
+            _download(url, dest, name)
+        except requests.HTTPError as e:
+            print(f"\n  ⚠  Download failed ({e.response.status_code}): {name}")
+            print(f"     Download manually: {url}")
+            dest.unlink(missing_ok=True)  # remove partial file
+            continue
         if name.endswith(".zip"):
             with zipfile.ZipFile(dest) as z:
                 z.extractall(deam_dir)
 
     csv_path = _best_annot_csv(deam_dir)
     if csv_path is None:
-        print("⚠  No annotation CSVs found in DEAM directory.")
+        print(f"⚠  No annotation CSVs found. Download DEAM_Annotations.zip manually:")
+        print(f"   https://zenodo.org/records/{_DEAM_ZENODO}")
+        print(f"   Extract into {deam_dir}/ and re-run this cell.")
         return None, None, None, None
 
     df = pd.read_csv(csv_path)
