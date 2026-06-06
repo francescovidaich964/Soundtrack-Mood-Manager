@@ -28,9 +28,12 @@ from huggingface_hub import snapshot_download
 # but gradio is never called during inference. Stub it out so we don't need
 # to install the full package.
 import sys as _sys
+
 if "gradio" not in _sys.modules:
     from unittest.mock import MagicMock as _MagicMock
+
     _sys.modules["gradio"] = _MagicMock()
+
 
 # torchaudio >= 2.9 dropped its own audio backends and routes torchaudio.load()
 # exclusively through torchcodec, which requires FFmpeg shared DLLs that are
@@ -49,10 +52,13 @@ def _sf_load(
 ):
     start = frame_offset
     stop = None if num_frames < 0 else (frame_offset + num_frames)
-    data, sr = sf.read(str(uri), dtype="float32", always_2d=True, start=start, stop=stop)
+    data, sr = sf.read(
+        str(uri), dtype="float32", always_2d=True, start=start, stop=stop
+    )
     # soundfile returns [samples, channels]; torchaudio returns [channels, samples]
     arr = data.T if channels_first else data
     return torch.from_numpy(np.ascontiguousarray(arr)), sr
+
 
 torchaudio.load = _sf_load
 
@@ -60,9 +66,13 @@ torchaudio.load = _sf_load
 # crashes on CPU-only machines. Patch torch.load to default map_location to "cpu".
 _orig_torch_load = torch.load
 
+
 @functools.wraps(_orig_torch_load)
 def _cpu_torch_load(f, map_location=None, weights_only=False, **kwargs):
-    return _orig_torch_load(f, map_location=map_location or "cpu", weights_only=weights_only, **kwargs)
+    return _orig_torch_load(
+        f, map_location=map_location or "cpu", weights_only=weights_only, **kwargs
+    )
+
 
 torch.load = _cpu_torch_load
 
@@ -83,8 +93,10 @@ def _get_model():
         path = _get_music2emo_path()
         if path not in sys.path:
             sys.path.insert(0, path)
-        from music2emo import Music2emo  # noqa: PLC0415
-        _model = Music2emo()
+        import music2emo as _m2e
+
+        _m2e.is_split = False
+        _model = _m2e.Music2emo()
     return _model
 
 
