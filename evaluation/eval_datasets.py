@@ -69,7 +69,13 @@ def setup_deam(data_dir: Path) -> tuple:
     deam_dir = Path(data_dir) / "deam"
     deam_dir.mkdir(parents=True, exist_ok=True)
 
-    meta = requests.get(f"https://zenodo.org/api/records/{_DEAM_ZENODO}").json()
+    resp = requests.get(f"https://zenodo.org/api/records/{_DEAM_ZENODO}")
+    if resp.status_code != 200 or not resp.text.strip():
+        print(f"⚠  Zenodo API returned {resp.status_code} (possibly rate-limited or down).")
+        print(f"   Download annotations manually from https://zenodo.org/records/{_DEAM_ZENODO}")
+        print(f"   Then place them in {deam_dir}/ and re-run this cell.")
+        return None, None, None, None
+    meta = resp.json()
     print(f"DEAM — {meta.get('metadata', {}).get('title', 'Zenodo record')}")
 
     for f in meta.get("files", []):
