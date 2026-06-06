@@ -79,7 +79,7 @@ def cross_dataset_comparison(df: pd.DataFrame) -> None:
             for dim in ["valence", "arousal"]:
                 m = compute_metrics(sub, dim)
                 rows.append({"Model": model, "Dataset": ds, "Dim": dim,
-                             "MAE": m["mae"], "R²": m["r2"]})
+                             "MAE": m["mae"], "R²": m["r2"], "Kendall τ": m["kendall_tau"]})
 
     summary = pd.DataFrame(rows)
     if summary.empty:
@@ -91,9 +91,13 @@ def cross_dataset_comparison(df: pd.DataFrame) -> None:
     x = np.arange(len(datasets))
     width = 0.8 / len(models)
     offsets = np.linspace(-(len(models) - 1) * width / 2, (len(models) - 1) * width / 2, len(models))
-    metric_cfg = [("MAE", "MAE (lower is better)"), ("R²", "R² (higher is better)")]
+    metric_cfg = [
+        ("MAE",       "MAE (lower is better)"),
+        ("R²",        "R² (higher is better)"),
+        ("Kendall τ", "Kendall τ (higher is better)"),
+    ]
 
-    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+    fig, axes = plt.subplots(3, 2, figsize=(14, 15))
     for row_i, (metric_key, metric_label) in enumerate(metric_cfg):
         for col_i, dim in enumerate(["valence", "arousal"]):
             ax = axes[row_i][col_i]

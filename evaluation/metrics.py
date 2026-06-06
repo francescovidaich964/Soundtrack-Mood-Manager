@@ -14,23 +14,31 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-from scipy.stats import pearsonr
+from scipy.stats import kendalltau, pearsonr
 
 
 def compute_metrics(df: pd.DataFrame, dim: str) -> dict:
-    """MAE, R², and Pearson r for one dimension (valence or arousal).
+    """MAE, R², Pearson r, and Kendall's τ for one dimension (valence or arousal).
 
     Args:
         df:  DataFrame with columns ``dim`` (prediction) and ``gt_<dim>`` (ground truth).
         dim: 'valence' or 'arousal'.
 
     Returns:
-        Dict with keys n, mae, r2, pearson_r.
+        Dict with keys n, mae, r2, pearson_r, kendall_tau.
+
+    Kendall's τ counts concordant vs discordant pairs across all song pairs:
+      τ = (concordant − discordant) / total_pairs  ∈ [−1, 1]
+    It measures whether the model ranks songs in the right relative order,
+    independent of whether the absolute predicted values are accurate.
+    This complements MAE/R² and is the continuous-data analogue of the
+    pairwise accuracy used for MusAV (see issue #17).
     """
     gt_col = f"gt_{dim}"
     valid = df[[dim, gt_col]].dropna()
     if len(valid) < 2:
-        return {"n": len(valid), "mae": float("nan"), "r2": float("nan"), "pearson_r": float("nan")}
+        return {"n": len(valid), "mae": float("nan"), "r2": float("nan"),
+                "pearson_r": float("nan"), "kendall_tau": float("nan")}
 
     y_true = valid[gt_col].values
     y_pred = valid[dim].values
@@ -38,7 +46,8 @@ def compute_metrics(df: pd.DataFrame, dim: str) -> dict:
     r, _ = pearsonr(y_pred, y_true)
     ss_tot = float(np.sum((y_true - np.mean(y_true)) ** 2))
     r2 = float(1 - np.sum((y_true - y_pred) ** 2) / ss_tot) if ss_tot > 0 else float("nan")
-    return {"n": len(valid), "mae": mae, "r2": r2, "pearson_r": float(r)}
+    tau, _ = kendalltau(y_pred, y_true)
+    return {"n": len(valid), "mae": mae, "r2": r2, "pearson_r": float(r), "kendall_tau": float(tau)}
 
 
 def print_metrics(df: pd.DataFrame, title: str = "") -> None:
@@ -68,11 +77,12 @@ def print_metrics(df: pd.DataFrame, title: str = "") -> None:
                 continue
             m = compute_metrics(grp, dim)
             rows.append({
-                "Dim":       dim,
-                "n":         m["n"],
-                "MAE":       f"{m['mae']:.4f}",
-                "R²":        f"{m['r2']:.4f}",
-                "Pearson r": f"{m['pearson_r']:.4f}",
+                "Dim":         dim,
+                "n":           m["n"],
+                "MAE":         f"{m['mae']:.4f}",
+                "R²":          f"{m['r2']:.4f}",
+                "Pearson r":   f"{m['pearson_r']:.4f}",
+                "Kendall τ":   f"{m['kendall_tau']:.4f}",
             })
         if rows:
             indent = "    " if ds_name else "  "
