@@ -568,7 +568,9 @@ const UI = (() => {
     _stateTimestamp  = Date.now();
 
     const track = state?.track_window?.current_track;
-    _playingTrackId  = track?.id || null;
+    // Prefer linked_from.id: Spotify may relink a requested track to a
+    // different version; linked_from carries the original ID stored in data.js.
+    _playingTrackId  = track?.linked_from?.id || track?.id || null;
 
     // Update labels
     const titleEl  = document.getElementById("track-title");

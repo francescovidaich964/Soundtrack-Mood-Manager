@@ -221,6 +221,35 @@ button:active {
 }
 
 /* ----------------------------------------------------------------
+   Preview banner (shown on non-main branch deploys)
+   ---------------------------------------------------------------- */
+
+#preview-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: rgba(201,168,76,0.08);
+  border-bottom: 1px solid rgba(201,168,76,0.22);
+  color: rgba(232,224,208,0.5);
+  font-family: "Courier New", monospace;
+  font-size: 0.7rem;
+  text-align: center;
+  padding: 3px 8px;
+  letter-spacing: 0.04em;
+  z-index: 50;
+}
+
+#preview-banner code {
+  color: rgba(201,168,76,0.85);
+}
+
+/* Push the page content below the banner when it is visible */
+body:has(#preview-banner:not([hidden])) .app {
+  padding-top: calc(2rem + 22px);
+}
+
+/* ----------------------------------------------------------------
    Responsive — keep usable on smaller screens
    ---------------------------------------------------------------- */
 
