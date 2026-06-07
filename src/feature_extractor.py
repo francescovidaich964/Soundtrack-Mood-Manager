@@ -34,6 +34,16 @@ if "gradio" not in _sys.modules:
 
     _sys.modules["gradio"] = _MagicMock()
 
+# music2emo logs "audio file loaded and feature computation success" at INFO
+# level via absl-py for every predict() call. Suppress INFO so the sync log
+# is not flooded; WARNING and above (real errors) are still shown.
+try:
+    from absl import logging as _absl_logging
+
+    _absl_logging.set_verbosity(_absl_logging.WARNING)
+except ImportError:
+    pass
+
 
 # torchaudio >= 2.9 dropped its own audio backends and routes torchaudio.load()
 # exclusively through torchcodec, which requires FFmpeg shared DLLs that are
