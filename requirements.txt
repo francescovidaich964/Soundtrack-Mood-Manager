@@ -1,14 +1,24 @@
 # Python dependencies for sync.py
-# Run on Linux/macOS (or GitHub Actions ubuntu-latest) — not Windows native.
+# Works on Linux, macOS, and Windows.
 #
 # Install:
 #   pip install -r requirements.txt
 #
-# NOTE: essentia-tensorflow has no Windows wheels.
-# On Linux/macOS: pip install essentia-tensorflow
-# On Windows: use GitHub Actions (see .github/workflows/sync.yml) or WSL2.
+# On first run, snapshot_download fetches the full amaai-lab/music2emo repo
+# (~76 MB) and MERT-v1-95M weights (~378 MB) into ~/.cache/huggingface/.
 
 spotipy>=2.23.0
-essentia-tensorflow  # only dev wheels exist; no version pin
 numpy>=1.24.0
 tqdm>=4.0.0
+
+# music2emo inference dependencies (not on PyPI; loaded via snapshot_download)
+transformers      # MERT-v1-95M backbone
+torchaudio        # audio resampling and transforms
+soundfile>=0.12.0 # MP3/audio decoding via libsndfile 1.1+ (replaces torchcodec on Windows)
+librosa           # spectrogram features for chord detection
+mir_eval          # chord interval encoding
+pretty_midi       # MIDI generation for key detection
+music21           # key signature analysis
+hydra-core        # HParams config loader
+omegaconf         # config backend for hydra
+pytorch_lightning # .ckpt checkpoint loading

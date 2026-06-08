@@ -11,7 +11,7 @@ sync.py                        ← orchestrator (calls all modules below)
 src/
   spotify_client.py            ← fetch playlist metadata from Spotify Web API
   downloader.py                ← download 30-second preview MP3s
-  feature_extractor.py         ← extract valence/energy with Essentia TF models
+  feature_extractor.py         ← extract valence/energy with music2emo
   data_manager.py              ← read/write webapp/data.js
 ```
 
@@ -37,10 +37,8 @@ downloader.py
       │
       ▼
 feature_extractor.py
-  MonoLoader (16 kHz mono)
-  → TensorflowPredictMusiCNN  → embeddings  (N_frames × 200)
-  → TensorflowPredict2D       → predictions (N_frames × 2)
-  → mean over frames
+  music2emo.predict(audio_path)
+  → valence, arousal in [1, 9]
   → normalize [1,9] → [0,1]
   → (valence, energy)
       │
@@ -90,20 +88,17 @@ Downloads the 30-second preview MP3 that Spotify embeds on `open.spotify.com/emb
 
 ## feature_extractor.py
 
-Extracts `valence` and `energy` from an audio file using two Essentia TensorFlow models.
+Extracts `valence` and `energy` from an audio file using [amaai-lab/music2emo](https://huggingface.co/amaai-lab/music2emo).
 
 **Pipeline:**
-1. Load audio as 16 kHz mono
-2. `TensorflowPredictMusiCNN` (`msd-musicnn-1.pb`) → embeddings of shape `(N_frames, 200)`
-3. `TensorflowPredict2D` (`emomusic-msd-musicnn-2.pb`) → predictions of shape `(N_frames, 2)`
-4. Mean over frames → `[valence_mean, arousal_mean]`
-5. Normalize from EmoMusic scale `[1, 9]` → `[0.0, 1.0]`
+1. `music2emo.Music2Emo().predict(audio_path)` → `{"valence": float, "arousal": float, ...}` in range [1, 9]
+2. Normalize from EmoMusic scale `[1, 9]` → `[0.0, 1.0]` via `(x - 1) / 8`
 
-Column 0 = valence (negative ↔ positive), column 1 = arousal (calm ↔ energetic, used as "energy").
+valence = negative ↔ positive, arousal = calm ↔ energetic (used as "energy").
 
-**Platform note:** `essentia-tensorflow` has no Windows wheels. This module only runs on Linux/macOS — i.e., in GitHub Actions or WSL2.
+**Platform:** Works on Linux, macOS, and Windows (torch + transformers).
 
-**Models** are lazy-loaded on first call and cached for the process lifetime. The `.pb` files are downloaded by the sync workflow and cached between runs via `actions/cache`.
+**Model** is lazy-loaded on first call and cached for the process lifetime. Weights are downloaded automatically from HuggingFace to `~/.cache/huggingface/` and cached between workflow runs via `actions/cache`.
 
 ---
 

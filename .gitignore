@@ -20,11 +20,14 @@ build/
 venv/
 env/
 
-# Essentia models (large binary files — download separately)
-models/*.pb
-
 # Temp download dir
 /tmp/
+
+# Local test files
+webapp/*.js
+
+# Local caches
+.cache/
 
 # OS
 .DS_Store

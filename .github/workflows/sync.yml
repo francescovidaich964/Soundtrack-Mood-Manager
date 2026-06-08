@@ -65,28 +65,6 @@ jobs:
           fi
 
       # ------------------------------------------------------------------
-      # Cache Essentia .pb models so we don't re-download them every run.
-      # The cache key includes the model filenames; change it if you swap models.
-      # ------------------------------------------------------------------
-      - name: Cache Essentia models
-        id: cache-models
-        uses: actions/cache@v4
-        with:
-          path: models/
-          key: essentia-models-msd-musicnn-1-emomusic-msd-musicnn-2
-
-      - name: Download Essentia models (if not cached)
-        if: steps.cache-models.outputs.cache-hit != 'true'
-        run: |
-          mkdir -p models
-          curl -fL -o models/msd-musicnn-1.pb \
-            https://essentia.upf.edu/models/feature-extractors/musicnn/msd-musicnn-1.pb
-          curl -fL -o models/emomusic-msd-musicnn-2.pb \
-            https://essentia.upf.edu/models/classification-heads/emomusic/emomusic-msd-musicnn-2.pb
-          echo "Models downloaded:"
-          ls -lh models/
-
-      # ------------------------------------------------------------------
       # Python environment
       # ------------------------------------------------------------------
       - name: Set up Python 3.11
@@ -100,6 +78,13 @@ jobs:
           path: ~/.cache/pip
           key: pip-${{ hashFiles('requirements.txt') }}
           restore-keys: pip-
+
+      # Cache music2emo weights so they aren't re-downloaded from HuggingFace every run.
+      - name: Cache HuggingFace model weights
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface/
+          key: music2emo-hf-cache-v1
 
       - name: Install dependencies
         run: pip install -r requirements.txt

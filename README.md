@@ -18,7 +18,7 @@ sad / energetic   →   happy / energetic
 
 ## How it works
 
-- **Phase 1 — Sync** (GitHub Actions, Linux): fetches your Spotify playlist, downloads 30-second preview clips from Spotify's embed pages, analyzes them with [Essentia](https://essentia.upf.edu/) TensorFlow models, and writes `webapp/data.js`.
+- **Phase 1 — Sync** (GitHub Actions): fetches your Spotify playlist, downloads 30-second preview clips from Spotify's embed pages, analyzes them with [music2emo](https://huggingface.co/amaai-lab/music2emo) to extract valence and energy, and writes `webapp/data.js`.
 - **Phase 2 — Session** (your browser): reads `data.js`, authenticates via Spotify PKCE, plays music through the Spotify Web Playback SDK — no local server needed.
 
 > **Spotify Premium required** — the Web Playback SDK only works with Premium accounts.
@@ -145,10 +145,9 @@ The webapp will be served at `https://<you>.github.io/Soundtrack-Mood-Manager/`.
 Go to **Actions → Sync Playlist → Run workflow → Run workflow**.
 
 The workflow will:
-1. Download the Essentia `.pb` model files (~3 MB + ~80 KB, cached after the first run).
-2. Install Python dependencies.
-3. Download each track's 30-second preview clip and analyze it with Essentia.
-4. Write `webapp/data.js` and `webapp/js/config.js`.
+1. Install Python dependencies (music2emo model weights are downloaded automatically on first use and cached).
+2. Download each track's 30-second preview clip and analyze it with music2emo.
+3. Write `webapp/data.js` and `webapp/js/config.js`.
 5. Deploy `webapp/` to the `gh-pages` branch → GitHub Pages updates automatically.
 
 With a 300-track playlist, the first run takes **~10 minutes**. Subsequent runs only process new tracks (already-analyzed tracks are cached in `data.js`).
@@ -170,23 +169,17 @@ The preview slot is shared — the last push to any non-main branch wins. Each s
 
 ## Local development
 
-Running `sync.py` locally requires Linux, macOS, or WSL2 (`essentia-tensorflow` has no Windows wheels).
+Running `sync.py` locally works on Linux, macOS, and Windows.
 
 ```bash
-# 1. Install dependencies
+# 1. Install dependencies (music2emo downloads its model weights automatically on first run)
 pip install -r requirements.txt
 
-# 2. Download the Essentia models
-mkdir -p models
-curl -L -o models/msd-musicnn-1.pb \
-  https://essentia.upf.edu/models/feature-extractors/musicnn/msd-musicnn-1.pb
-curl -L -o models/emomusic-msd-musicnn-2.pb \
-  https://essentia.upf.edu/models/classification-heads/emomusic/emomusic-msd-musicnn-2.pb
+# 2. Fill in config.json (client_id, client_secret, playlist_id, refresh_token)
+cp config.json.example config.json      # macOS / Linux
+# copy config.json.example config.json  # Windows
 
-# 3. Fill in config.json (client_id, client_secret, playlist_id, refresh_token)
-cp config.json.example config.json
-
-# 4. Run sync (--local starts a static server and opens the browser)
+# 3. Run sync (--local starts a static server and opens the browser)
 python sync.py --local
 ```
 
