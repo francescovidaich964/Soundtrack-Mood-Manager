@@ -2,7 +2,13 @@ name: Claude PR Review
 
 on:
   pull_request:
+    # NOTE: intentionally no 'synchronize' — re-reviews are triggered manually
+    # via @claude comments to control API costs. See REVIEW_PR.md re-review flow.
     types: [opened, reopened, ready_for_review]
+    branches:
+      - main
+      - dev
+      - 'feature/**'
   # Allow @claude mentions in PR comments for on-demand re-reviews
   issue_comment:
     types: [created]
@@ -20,13 +26,22 @@ jobs:
     # Run on PR events (skip drafts), or on @claude mentions in comments
     if: |
       (github.event_name == 'pull_request' && github.event.pull_request.draft == false) ||
-      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude'))
+      (github.event_name == 'issue_comment' && github.event.issue.pull_request && contains(github.event.comment.body, '@claude'))
+    concurrency:
+      group: claude-review-${{ github.event.pull_request.number || github.event.issue.number }}
+      cancel-in-progress: true
     timeout-minutes: 30
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
+
+      - name: Checkout PR branch (for comment triggers)
+        if: github.event_name == 'issue_comment'
+        run: gh pr checkout ${{ github.event.issue.number }}
+        env:
+          GH_TOKEN: ${{ github.token }}
 
       - name: Detect review mode
         id: mode
@@ -37,6 +52,7 @@ jobs:
           else
             echo "type=re-review" >> $GITHUB_OUTPUT
             echo "pr=${{ github.event.issue.number }}" >> $GITHUB_OUTPUT
+            echo "comment_id=${{ github.event.comment.id }}" >> $GITHUB_OUTPUT
           fi
 
       - name: Run Claude Code Review
@@ -46,9 +62,9 @@ jobs:
           prompt: |
             Review PR #${{ steps.mode.outputs.pr }} in ${{ github.repository }}.
             Review mode: ${{ steps.mode.outputs.type }}.
-            ${{ github.event_name == 'issue_comment' && format('User comment triggering this re-review: "{0}"', github.event.comment.body) || '' }}
-            Follow all instructions in .claude/skills/review-pr.md.
+            ${{ steps.mode.outputs.type == 're-review' && format('Fetch the triggering comment with: gh api repos/{0}/issues/comments/{1} --jq .body', github.repository, steps.mode.outputs.comment_id) || '' }}
+            Follow all instructions in .claude/skills/REVIEW_PR.md.
           claude_args: |
             --allowedTools Bash,Read,Glob,Grep
             --max-turns 30
-            --model claude-opus-4-6
+            --model claude-opus-4-8
