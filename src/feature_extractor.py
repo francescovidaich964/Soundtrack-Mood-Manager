@@ -46,6 +46,13 @@ def _measure_and_normalize(
     return pyln.normalize.loudness(audio, loudness, _TARGET_LUFS), float(loudness)
 
 
+### EXPERIMENTAL PATCH for VALENCE CORRECTION based on key ###
+# Valence correction alpha based on EmoMusic dataset statistics:
+# mean valence major ≈ 5.8/9 vs minor ≈ 4.6/9 → gap ≈ 0.13 after normalization to [0, 1].
+# Applied as: valence += _ALPHA * (is_major - 0.5) * key_strength
+# Weighted by KeyExtractor confidence so ambiguous/atonal tracks get near-zero correction.
+_ALPHA = 0.13
+
 # Lazy-loaded module-level references so the heavy TF import only happens once.
 _MonoLoader = None
 _TensorflowPredictMusiCNN = None
@@ -54,13 +61,14 @@ _TensorflowPredict2D = None
 # Loaded model instances (one per process).
 _musicnn_model = None
 _emomusic_model = None
+_key_extractor = None
 _models_dir_loaded: Path | None = None
 
 
 def _load_models(models_dir: Path) -> None:
     """Import Essentia and instantiate both models (idempotent)."""
     global _MonoLoader, _TensorflowPredictMusiCNN, _TensorflowPredict2D
-    global _musicnn_model, _emomusic_model, _models_dir_loaded
+    global _musicnn_model, _emomusic_model, _key_extractor, _models_dir_loaded
 
     if _models_dir_loaded == models_dir:
         return  # already loaded
@@ -69,6 +77,7 @@ def _load_models(models_dir: Path) -> None:
         import essentia  # type: ignore[import]
         essentia.log.warningActive = False  # suppress C++ "No network created" warnings
         from essentia.standard import (  # type: ignore[import]
+            KeyExtractor,
             MonoLoader,
             TensorflowPredict2D,
             TensorflowPredictMusiCNN,
@@ -107,6 +116,7 @@ def _load_models(models_dir: Path) -> None:
     _MonoLoader = MonoLoader
     _TensorflowPredictMusiCNN = TensorflowPredictMusiCNN
     _TensorflowPredict2D = TensorflowPredict2D
+    _key_extractor = KeyExtractor(sampleRate=16000)
     _models_dir_loaded = models_dir
 
 
@@ -132,6 +142,15 @@ def analyze(audio_path: Path, models_dir: Path) -> tuple[float, float, float | N
         audio = _MonoLoader(filename=str(audio_path), sampleRate=16000)()
         audio, loudness_db = _measure_and_normalize(audio)
 
+        # 1b. Key detection — classical HPCP-based, operates on the same 16 kHz audio.
+        #     strength weights the correction: low confidence → correction shrinks to zero.
+        try:
+            _key, scale, key_strength = _key_extractor(audio)
+            is_major = 1.0 if scale == "major" else 0.0
+        except Exception:
+            is_major = 0.5    # neutral: (0.5 - 0.5) * anything = 0 correction
+            key_strength = 0.0
+
         # 2. MusiCNN embeddings: shape (N_frames, 200)
         embeddings = _musicnn_model(audio)
 
@@ -151,6 +170,11 @@ def analyze(audio_path: Path, models_dir: Path) -> tuple[float, float, float | N
         # 5. Normalize from EmoMusic scale [1, 9] → [0, 1] and clip.
         valence = float(np.clip((mean[0] - 1.0) / 8.0, 0.0, 1.0))
         energy = float(np.clip((mean[1] - 1.0) / 8.0, 0.0, 1.0))
+
+        # 5b. Key-mode valence correction weighted by key detection confidence.
+        #     Full-confidence major: +0.065 | Full-confidence minor: −0.065
+        #     Near-zero strength (ambiguous/atonal key): correction ≈ 0
+        valence = float(np.clip(valence + _ALPHA * (is_major - 0.5) * key_strength, 0.0, 1.0))
 
         # np.clip does not sanitise NaN; guard so callers never store NaN in data.js.
         # (json.dumps writes float('nan') as the bare JS token NaN, which then passes
