@@ -27,6 +27,24 @@ import warnings
 from pathlib import Path
 
 import numpy as np
+import pyloudnorm as pyln
+
+_TARGET_LUFS = -14.0
+
+
+def _measure_and_normalize(
+    audio: np.ndarray, sr: int = 16000
+) -> tuple[np.ndarray, float | None]:
+    """Normalize audio to _TARGET_LUFS; return (normalized_audio, original_lufs).
+
+    Returns (audio, None) if loudness is unmeasurable (silence, too short, etc.).
+    """
+    meter = pyln.Meter(sr)
+    loudness = meter.integrated_loudness(audio)
+    if not np.isfinite(loudness) or loudness < -70.0:
+        return audio, None
+    return pyln.normalize.loudness(audio, loudness, _TARGET_LUFS), float(loudness)
+
 
 ### EXPERIMENTAL PATCH for VALENCE CORRECTION based on key ###
 # Valence correction alpha based on EmoMusic dataset statistics:
@@ -102,15 +120,17 @@ def _load_models(models_dir: Path) -> None:
     _models_dir_loaded = models_dir
 
 
-def analyze(audio_path: Path, models_dir: Path) -> tuple[float, float] | None:
-    """Extract (valence, energy) from an audio file.
+def analyze(audio_path: Path, models_dir: Path) -> tuple[float, float, float | None] | None:
+    """Extract (valence, energy, loudness_db) from an audio file.
 
     Args:
         audio_path: Path to the MP3 (or any format MonoLoader accepts).
         models_dir: Directory containing the .pb model files.
 
     Returns:
-        (valence, energy) both in [0.0, 1.0], or None on any failure.
+        (valence, energy, loudness_db) where valence/energy are in [0.0, 1.0]
+        and loudness_db is the integrated LUFS of the original audio (before
+        normalization), or None if unmeasurable. Returns None on any failure.
     """
     try:
         _load_models(models_dir)
@@ -118,8 +138,9 @@ def analyze(audio_path: Path, models_dir: Path) -> tuple[float, float] | None:
         raise  # let the caller log and skip
 
     try:
-        # 1. Load audio as mono at 16 kHz.
+        # 1. Load audio as mono at 16 kHz and normalize loudness.
         audio = _MonoLoader(filename=str(audio_path), sampleRate=16000)()
+        audio, loudness_db = _measure_and_normalize(audio)
 
         # 1b. Key detection — classical HPCP-based, operates on the same 16 kHz audio.
         #     strength weights the correction: low confidence → correction shrinks to zero.
@@ -161,7 +182,7 @@ def analyze(audio_path: Path, models_dir: Path) -> tuple[float, float] | None:
         if not (math.isfinite(valence) and math.isfinite(energy)):
             return None
 
-        return valence, energy
+        return valence, energy, loudness_db
 
     except Exception:  # noqa: BLE001
         # Corrupted audio, model inference error, etc. — skip the track.
