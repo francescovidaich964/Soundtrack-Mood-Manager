@@ -26,6 +26,9 @@ models/*.pb
 # Temp download dir
 /tmp/
 
+# Evaluation data (large datasets — download separately)
+evaluation/data/
+
 # OS
 .DS_Store
 Thumbs.db
