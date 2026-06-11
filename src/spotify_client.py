@@ -58,7 +58,7 @@ class SpotifyClient:
         # GET /playlists/{id} embeds the first track page in its response.
         # Spotify uses 'tracks' or 'items' as the outer key depending on the
         # playlist type; each entry uses 'track' or 'item' for the track data.
-        result = self._fetch_with_retry(self._sp.playlist, playlist_id)
+        result = self._fetch_with_retry(self._sp.playlist, playlist_id, market="from_token")
         page = result.get("tracks") or result.get("items") or {}
 
         while page:
@@ -84,7 +84,7 @@ class SpotifyClient:
     def get_playlist_name(self, playlist_id: str) -> str:
         """Return the playlist's display name."""
         playlist_id = self._normalize_playlist_id(playlist_id)
-        info = self._fetch_with_retry(self._sp.playlist, playlist_id, fields="name")
+        info = self._fetch_with_retry(self._sp.playlist, playlist_id, fields="name", market="from_token")
         return info.get("name", "")
 
     # ------------------------------------------------------------------
