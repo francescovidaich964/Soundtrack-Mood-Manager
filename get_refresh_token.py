@@ -102,7 +102,7 @@ except Exception:
 # -----------------------------------------------------------------------
 
 print("After logging in, your browser will land on a page titled")
-print("'DnD Soundtrack — Token Setup' that shows a URL.")
+print("'Soundtrack MoodPad — Token Setup' that shows a URL.")
 print()
 print("Click the URL box on that page, copy it (Ctrl+C), and paste it below.")
 print()

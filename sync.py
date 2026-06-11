@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-sync.py — Phase 1 of the DnD Soundtrack Manager
+sync.py — Phase 1 of Soundtrack MoodPad
 
 Fetches a Spotify playlist, downloads 30-second preview clips, extracts
 valence/energy with Essentia, and writes the results to webapp/data.js.
@@ -82,7 +82,7 @@ window.CONFIG = {{
   clientId: {client_id},
   redirectUri: window.location.origin + window.location.pathname.replace(/index\\.html$/, ""),
   scopes: "streaming user-read-email user-read-private user-modify-playback-state user-read-playback-state",
-  playerName: "DnD Player",
+  playerName: "MoodPad",
   sigma: 0.15,
   recentlyPlayedSize: 5,
 }};
@@ -167,7 +167,7 @@ def _update_data_version(webapp_dir: Path, generated_at: str) -> None:
 # ---------------------------------------------------------------------------
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Sync Spotify playlist for DnD Soundtrack Manager")
+    parser = argparse.ArgumentParser(description="Sync Spotify playlist for Soundtrack MoodPad")
     parser.add_argument("--playlist", metavar="URL_OR_ID", help="Override playlist ID from config/env")
     parser.add_argument("--force-reanalyze", action="store_true", help="Re-analyze all tracks even if cached")
     parser.add_argument("--local", action="store_true", help="Start a local HTTP server after sync (requires Linux/macOS/WSL)")
@@ -198,11 +198,11 @@ def main() -> None:
 
     webapp_dir = REPO_ROOT / "webapp"
     models_dir = REPO_ROOT / "models"
-    temp_base = Path(tempfile.gettempdir()) / "dnd_analysis"
+    temp_base = Path(tempfile.gettempdir()) / "moodpad_analysis"
     data_js_path = webapp_dir / "data.js"
     port = config.get("port", 8080)
 
-    print("DnD Soundtrack Manager — sync")
+    print("Soundtrack MoodPad — sync")
     print(f"  Playlist: {playlist_id}")
 
     # ------------------------------------------------------------------

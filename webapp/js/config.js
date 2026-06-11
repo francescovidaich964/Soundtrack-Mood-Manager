@@ -4,7 +4,7 @@ window.CONFIG = {
   clientId: "",
   redirectUri: "http://localhost:8080",
   scopes: "streaming user-read-email user-read-private user-modify-playback-state user-read-playback-state",
-  playerName: "DnD Player",
+  playerName: "MoodPad",
   sigma: 0.15,
   recentlyPlayedSize: 5,
 };

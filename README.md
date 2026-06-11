@@ -1,6 +1,6 @@
-# DnD Soundtrack Manager
+# Soundtrack MoodPad
 
-A mood-driven music player for Dungeons & Dragons sessions. Click a point on a 2D **valence × energy** canvas to set the atmosphere, and the app continuously picks tracks from your Spotify playlist that match the current mood. Scroll or pinch to zoom in on dense clusters of tracks.
+A mood-driven music player for any session where atmosphere matters. Click a point on a 2D **valence × energy** canvas to set the atmosphere, and the app continuously picks tracks from your Spotify playlist that match the current mood. Scroll or pinch to zoom in on dense clusters of tracks.
 
 ```
 sad / calm        →        happy / calm
@@ -100,7 +100,7 @@ python get_refresh_token.py
 The script will:
 1. Remind you to add `https://<you>.github.io/Soundtrack-Mood-Manager/token.html` as a Redirect URI in your Spotify app (if not done yet).
 2. Open your browser to the Spotify login page.
-3. After login, your browser lands on a page titled **"DnD Soundtrack — Token Setup"** that displays a URL.
+3. After login, your browser lands on a page titled **"Soundtrack MoodPad — Token Setup"** that displays a URL.
 4. You copy that URL and paste it back into the terminal.
 5. The script prints your **refresh token**.
 
