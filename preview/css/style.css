@@ -214,10 +214,19 @@ button:active {
    ---------------------------------------------------------------- */
 
 .playlist-info {
-  font-size: 0.72rem;
-  color: rgba(232,224,208,0.3);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  color: rgba(232,224,208,0.35);
   letter-spacing: 0.06em;
   text-align: center;
+}
+
+.playlist-selector-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 /* Playlist selector in footer */
@@ -226,11 +235,11 @@ button:active {
   color: inherit;
   border: 1px solid rgba(201,168,76,0.35);
   border-radius: 4px;
-  padding: 2px 6px;
+  padding: 3px 8px;
   font: inherit;
-  font-size: 0.8em;
+  font-size: 0.88rem;
   cursor: pointer;
-  max-width: 220px;
+  max-width: 240px;
 }
 
 #playlist-select:focus {
@@ -243,9 +252,16 @@ button:active {
 }
 
 #playlist-track-count {
-  font-size: 0.8em;
-  opacity: 0.5;
-  margin-left: 6px;
+  font-size: 0.82rem;
+  opacity: 0.6;
+  white-space: nowrap;
+}
+
+#playlist-id {
+  font-family: "Courier New", monospace;
+  font-size: 0.68rem;
+  opacity: 0.35;
+  letter-spacing: 0.04em;
 }
 
 /* ----------------------------------------------------------------

@@ -55,8 +55,11 @@
 
     <!-- ---- Playlist info ---- -->
     <footer class="playlist-info" id="playlist-info">
-      <select id="playlist-select" aria-label="Select playlist"></select>
-      <span id="playlist-track-count"></span>
+      <div class="playlist-selector-row">
+        <select id="playlist-select" aria-label="Select playlist"></select>
+        <span id="playlist-track-count"></span>
+      </div>
+      <span id="playlist-id"></span>
     </footer>
 
   </main>
@@ -74,7 +77,7 @@
     8. app.js (inline) — wires everything together
     9. Spotify SDK  — async so it doesn't block; triggers onSpotifyWebPlaybackSDKReady
   -->
-  <script defer src="data.js?v=20260611072948"></script>
+  <script defer src="data.js"></script>
   <script defer src="js/build-info.js"></script>
   <script defer src="js/config.js"></script>
   <script defer src="js/auth.js"></script>
@@ -122,6 +125,7 @@
       // ---- 3. Populate playlist selector ----
       const selectEl = document.getElementById('playlist-select');
       const countEl  = document.getElementById('playlist-track-count');
+      const idEl     = document.getElementById('playlist-id');
 
       for (const [id, meta] of Object.entries(playlists)) {
         const opt = document.createElement('option');
@@ -150,6 +154,7 @@
           const n = selector.count;
           countEl.textContent = `${n} track${n !== 1 ? 's' : ''}`;
         }
+        if (idEl) idEl.textContent = playlistId;
 
         UI.setTracks(selector);
       }
