@@ -23,11 +23,11 @@ sad / energetic   →   happy / energetic
 
 > **Spotify Premium required** — the Web Playback SDK only works with Premium accounts.
 
-### Phase 1 - Updating the playlist
+### Phase 1 - Syncing playlists
 
-Trigger **Actions → Sync Playlist → Run workflow** again. Only new tracks are downloaded and analyzed; existing ones are skipped.
+Trigger **Actions → Sync Playlist → Run workflow** with a playlist URL or ID. Only new tracks are downloaded and analyzed; existing tracks in `data.js` are skipped. Running the workflow again with a different playlist adds it alongside the existing one.
 
-To force re-analysis of every track (e.g. after switching playlists), check **force_reanalyze** in the workflow inputs.
+To force re-analysis of every track in the synced playlist, check **force_reanalyze** in the workflow inputs.
 
 ### Phase 2 - Using the webapp
 
@@ -114,17 +114,15 @@ Copy that token — you'll need it in the next step.
 
 Repository **Settings → Secrets and variables → Actions → New repository secret**.
 
-Add all four secrets:
+Add these three secrets:
 
 | Secret name | Where to find it |
 |---|---|
 | `SPOTIFY_CLIENT_ID` | Spotify app overview page → "Client ID" |
 | `SPOTIFY_CLIENT_SECRET` | Spotify app overview page → "Show client secret" |
-| `SPOTIFY_PLAYLIST_ID` | Open playlist in Spotify → Share → Copy link → the ID after `/playlist/` |
 | `SPOTIFY_REFRESH_TOKEN` | Printed by `get_refresh_token.py` in Step 3 |
 
-**Finding your playlist ID:**
-The URL `https://open.spotify.com/playlist/`**`37i9dQZF1DXcBWIGoYBM5M`** → the ID is the bold part.
+> **Playlist ID is no longer a secret.** You now pass it directly when running the Sync workflow — no `SPOTIFY_PLAYLIST_ID` secret needed.
 
 > The playlist must be **public** on Spotify.
 
@@ -142,7 +140,10 @@ The webapp will be served at `https://<you>.github.io/Soundtrack-Mood-Manager/`.
 
 ### Step 6 — Run the first sync
 
-Go to **Actions → Sync Playlist → Run workflow → Run workflow**.
+Go to **Actions → Sync Playlist → Run workflow**, fill in your playlist URL or ID in the **playlist** field, then click **Run workflow**.
+
+**Finding your playlist ID:**
+The URL `https://open.spotify.com/playlist/`**`37i9dQZF1DXcBWIGoYBM5M`** → the ID is the bold part. You can also paste the full URL directly.
 
 The workflow will:
 1. Download the Essentia `.pb` model files (~3 MB + ~80 KB, cached after the first run).
@@ -152,6 +153,20 @@ The workflow will:
 5. Deploy `webapp/` to the `gh-pages` branch → GitHub Pages updates automatically.
 
 With a 300-track playlist, the first run takes **~10 minutes**. Subsequent runs only process new tracks (already-analyzed tracks are cached in `data.js`).
+
+---
+
+## Adding more playlists
+
+Run **Actions → Sync Playlist → Run workflow** again with a different playlist URL or ID. The new playlist is merged into `data.js` alongside the existing one — no data is lost. Tracks shared between playlists are stored only once.
+
+A **dropdown** in the webapp footer lets you switch the active playlist at runtime.
+
+---
+
+## Removing a playlist
+
+Go to **Actions → Remove Playlist → Run workflow** and paste the playlist URL or ID. The workflow removes that playlist entry from `data.js` and prunes any tracks that are no longer referenced by any remaining playlist.
 
 ---
 
