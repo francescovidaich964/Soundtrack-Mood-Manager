@@ -224,6 +224,12 @@
           isPlaying = false;
         }
         loadPlaylist(selectEl.value);
+        if (selector && selector.count === 0) {
+          UI.showError(
+            "No analyzed tracks found in this playlist.\n" +
+            "Re-run the Sync Playlist workflow with force_reanalyze enabled."
+          );
+        }
       });
 
       // ---- 7. Player SDK ----
