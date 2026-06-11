@@ -261,7 +261,8 @@ def main() -> None:
     to_analyze = [
         existing["tracks"][t["track_id"]]
         for t in remote_tracks
-        if "valence" not in existing["tracks"].get(t["track_id"], {})
+        if args.force_reanalyze
+        or "valence" not in existing["tracks"].get(t["track_id"], {})
         or existing["tracks"].get(t["track_id"], {}).get("download_failed")
     ]
 

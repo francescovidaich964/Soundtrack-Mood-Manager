@@ -70,7 +70,9 @@ jobs:
       # Remove the playlist and prune orphaned tracks
       # ------------------------------------------------------------------
       - name: Remove playlist
-        run: python remove_playlist.py --playlist "${{ inputs.playlist }}"
+        env:
+          PLAYLIST: ${{ inputs.playlist }}
+        run: python remove_playlist.py --playlist "$PLAYLIST"
 
       # ------------------------------------------------------------------
       # Stamp build-info.js

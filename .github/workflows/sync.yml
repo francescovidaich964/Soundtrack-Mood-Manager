@@ -123,12 +123,14 @@ jobs:
           SPOTIFY_REFRESH_TOKEN: ${{ secrets.SPOTIFY_REFRESH_TOKEN }}
           GITHUB_PAGES_URL:      ${{ steps.target.outputs.pages_url }}
           GITHUB_REF_NAME:       ${{ github.ref_name }}
+          PLAYLIST:              ${{ inputs.playlist }}
+          FORCE_REANALYZE:       ${{ inputs.force_reanalyze }}
         run: |
           EXTRA_FLAGS=""
-          if [ "${{ inputs.force_reanalyze }}" = "true" ]; then
+          if [ "$FORCE_REANALYZE" = "true" ]; then
             EXTRA_FLAGS="--force-reanalyze"
           fi
-          python sync.py --playlist "${{ inputs.playlist }}" $EXTRA_FLAGS
+          python sync.py --playlist "$PLAYLIST" $EXTRA_FLAGS
 
       # ------------------------------------------------------------------
       # Stamp webapp/js/build-info.js so the preview banner knows which

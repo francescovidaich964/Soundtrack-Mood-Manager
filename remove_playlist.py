@@ -18,17 +18,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from src.data_manager import read_data_js, write_data_js
-
-
-def _normalize_playlist_id(raw: str) -> str:
-    """Accept a full Spotify URL, URI, or bare ID and return the bare ID."""
-    if "open.spotify.com/playlist/" in raw:
-        raw = raw.split("open.spotify.com/playlist/")[1]
-        raw = raw.split("?")[0]
-    elif raw.startswith("spotify:playlist:"):
-        raw = raw.split(":")[-1]
-    return raw.strip()
+from src.data_manager import normalize_playlist_id, read_data_js, write_data_js
 
 
 def main() -> None:
@@ -39,7 +29,7 @@ def main() -> None:
                         help="Spotify playlist URL or ID to remove")
     args = parser.parse_args()
 
-    playlist_id   = _normalize_playlist_id(args.playlist)
+    playlist_id   = normalize_playlist_id(args.playlist)
     data_js_path  = REPO_ROOT / "webapp" / "data.js"
 
     data = read_data_js(data_js_path)

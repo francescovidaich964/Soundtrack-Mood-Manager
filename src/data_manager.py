@@ -47,6 +47,20 @@ window.TRACK_DATA = {json_body};
 
 
 # ---------------------------------------------------------------------------
+# Public helpers
+# ---------------------------------------------------------------------------
+
+def normalize_playlist_id(raw: str) -> str:
+    """Accept a full Spotify URL, URI, or bare ID and return the bare ID."""
+    if "open.spotify.com/playlist/" in raw:
+        raw = raw.split("open.spotify.com/playlist/")[1]
+        raw = raw.split("?")[0]
+    elif raw.startswith("spotify:playlist:"):
+        raw = raw.split(":")[-1]
+    return raw.strip()
+
+
+# ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
 
@@ -58,21 +72,19 @@ def _migrate_old_format(data: dict) -> dict:
     old_synced_at = data.get("generated_at", "")
     old_branch    = data.get("sync_branch", "")
 
-    tracks_dict = {
-        t["track_id"]: t
-        for t in old_tracks_list
-        if isinstance(t, dict) and "track_id" in t
-    }
+    tracks_dict = {}
+    track_ids   = []
+    for t in old_tracks_list:
+        if isinstance(t, dict) and "track_id" in t:
+            tracks_dict[t["track_id"]] = t
+            track_ids.append(t["track_id"])
+
     playlists_dict = {
         old_pid: {
             "name":        old_name,
             "synced_at":   old_synced_at,
             "sync_branch": old_branch,
-            "track_ids": [
-                t["track_id"]
-                for t in old_tracks_list
-                if isinstance(t, dict) and "track_id" in t
-            ],
+            "track_ids":   track_ids,
         }
     }
     return {"playlists": playlists_dict, "tracks": tracks_dict}
