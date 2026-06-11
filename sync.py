@@ -6,20 +6,17 @@ Fetches a Spotify playlist, downloads 30-second preview clips, extracts
 valence/energy with Essentia, and writes the results to webapp/data.js.
 Also generates webapp/js/config.js (contains clientId — not a secret).
 
-Credential resolution order:
-  1. Environment variables (used by GitHub Actions):
-       SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_PLAYLIST_ID
-  2. config.json in the same directory as this script (local dev)
-  3. CLI --playlist overrides the playlist ID from either source
+Supports multiple playlists: each sync run adds or updates one playlist
+in data.js without touching tracks that belong only to other playlists.
 
-redirectUri resolution:
-  - The webapp detects its own URL at runtime (window.location)
-  - Works automatically for both GitHub Pages and local dev
+Credential resolution order:
+  1. CLI --playlist flag (preferred)
+  2. SPOTIFY_PLAYLIST_ID env variable (legacy; deprecated, prints a note)
+  3. playlist_id in config.json (local dev)
 
 Usage:
-  python sync.py
   python sync.py --playlist <url-or-id>
-  python sync.py --force-reanalyze
+  python sync.py --playlist <url-or-id> --force-reanalyze
   python sync.py --local              # also start a local HTTP server
 """
 
@@ -34,6 +31,7 @@ import sys
 import tempfile
 import time
 import webbrowser
+from datetime import datetime, timezone
 from pathlib import Path
 
 from tqdm import tqdm
@@ -190,7 +188,12 @@ def main() -> None:
     if not playlist_id:
         sys.exit(
             "ERROR: No playlist ID provided.\n"
-            "Use --playlist <url-or-id>, set SPOTIFY_PLAYLIST_ID, or add it to config.json."
+            "Pass --playlist <url-or-id>, or add playlist_id to config.json."
+        )
+    if not args.playlist and os.environ.get("SPOTIFY_PLAYLIST_ID"):
+        print(
+            "  NOTE: Using SPOTIFY_PLAYLIST_ID secret. Consider passing the playlist ID\n"
+            "        directly via the workflow 'playlist' input instead."
         )
 
     webapp_dir = REPO_ROOT / "webapp"
@@ -219,35 +222,47 @@ def main() -> None:
         sys.exit("ERROR: Playlist is empty or could not be fetched.")
 
     # ------------------------------------------------------------------
-    # 2. Load existing data.js cache
+    # 2. Load existing multi-playlist data
     # ------------------------------------------------------------------
-    cache = read_data_js(data_js_path)
-    if cache:
-        print(f"  Found cached data for {len(cache)} tracks in data.js")
+    existing = read_data_js(data_js_path)
+    if existing["tracks"]:
+        print(
+            f"  Cache: {len(existing['tracks'])} track(s), "
+            f"{len(existing['playlists'])} playlist(s) in data.js"
+        )
 
     # ------------------------------------------------------------------
-    # 3. Build the full track list (merge cache + remote metadata)
+    # 3. Merge remote tracks into the global tracks dict
     # ------------------------------------------------------------------
-    # Start with a fresh write so any removed tracks are dropped.
-    tracks_to_write: list[dict] = []
+    # Tracks already in the dict keep their valence/energy unless
+    # --force-reanalyze is set; new tracks are added as bare metadata.
     for t in remote_tracks:
-        if t["track_id"] in cache and not args.force_reanalyze:
-            tracks_to_write.append(cache[t["track_id"]])
-        else:
-            tracks_to_write.append(t)  # valence/energy to be filled in below
+        tid = t["track_id"]
+        if tid not in existing["tracks"] or args.force_reanalyze:
+            existing["tracks"][tid] = t
 
+    # ------------------------------------------------------------------
+    # 4. Update / create this playlist's entry
+    # ------------------------------------------------------------------
     sync_branch = os.environ.get("GITHUB_REF_NAME", "")
-    generated_at = write_data_js(data_js_path, playlist_name, playlist_id, tracks_to_write, sync_branch=sync_branch)
+    existing["playlists"][playlist_id] = {
+        "name":        playlist_name,
+        "synced_at":   datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "sync_branch": sync_branch,
+        "track_ids":   [t["track_id"] for t in remote_tracks],
+    }
+
+    generated_at = write_data_js(data_js_path, existing, sync_branch=sync_branch)
     _update_data_version(webapp_dir, generated_at)
 
     # ------------------------------------------------------------------
-    # 4. Analyze tracks that don't have valence/energy yet
+    # 5. Analyze tracks in this playlist that lack valence/energy
     # ------------------------------------------------------------------
     to_analyze = [
-        t for t in remote_tracks
-        if args.force_reanalyze
-        or "valence" not in cache.get(t["track_id"], {})
-        or cache[t["track_id"]].get("download_failed")
+        existing["tracks"][t["track_id"]]
+        for t in remote_tracks
+        if "valence" not in existing["tracks"].get(t["track_id"], {})
+        or existing["tracks"].get(t["track_id"], {}).get("download_failed")
     ]
 
     if not to_analyze:
@@ -288,13 +303,13 @@ def main() -> None:
         print(f"\ndata.js written: {data_js_path.relative_to(REPO_ROOT)}")
 
     # ------------------------------------------------------------------
-    # 5. Write webapp/js/config.js
+    # 6. Write webapp/js/config.js
     # ------------------------------------------------------------------
     print("\nWriting config.js...")
     write_config_js(webapp_dir, config["client_id"])
 
     # ------------------------------------------------------------------
-    # 6. Optionally start local server + open browser
+    # 7. Optionally start local server + open browser
     # ------------------------------------------------------------------
     if args.local:
         print(f"\nStarting local server on port {port}...")
