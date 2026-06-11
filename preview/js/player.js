@@ -35,7 +35,7 @@ const Player = (() => {
   // Compute a base volume so the quietest track in the playlist maps to 1.0,
   // ensuring no track ever needs to be clamped when boosted to target LUFS.
   // Falls back to 0.8 if no loudness data is available.
-  const _loudnessValues = (window.TRACK_DATA?.tracks ?? [])
+  const _loudnessValues = Object.values(window.TRACK_DATA?.tracks ?? {})
     .map(t => t.loudness_db)
     .filter(v => v != null);
   const _maxGain = Math.pow(10, (_TARGET_LUFS - Math.min(..._loudnessValues)) / 20);
