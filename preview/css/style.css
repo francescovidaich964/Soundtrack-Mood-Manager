@@ -220,6 +220,34 @@ button:active {
   text-align: center;
 }
 
+/* Playlist selector in footer */
+#playlist-select {
+  background: transparent;
+  color: inherit;
+  border: 1px solid rgba(201,168,76,0.35);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font: inherit;
+  font-size: 0.8em;
+  cursor: pointer;
+  max-width: 220px;
+}
+
+#playlist-select:focus {
+  outline: none;
+  border-color: rgba(201,168,76,0.7);
+}
+
+#playlist-select option {
+  background: #0d0d1a;
+}
+
+#playlist-track-count {
+  font-size: 0.8em;
+  opacity: 0.5;
+  margin-left: 6px;
+}
+
 /* ----------------------------------------------------------------
    Preview banner (shown on non-main branch deploys)
    ---------------------------------------------------------------- */

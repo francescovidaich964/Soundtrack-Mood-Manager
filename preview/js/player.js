@@ -26,29 +26,6 @@ const Player = (() => {
   let _onTrackChanged = null;  // (state) => void
   let _onTrackEnded = null;    // () => void
 
-  // ------------------------------------------------------------------
-  // Loudness normalization
-  // ------------------------------------------------------------------
-
-  const _TARGET_LUFS = -14.0;
-
-  // Compute a base volume so the quietest track in the playlist maps to 1.0,
-  // ensuring no track ever needs to be clamped when boosted to target LUFS.
-  // Falls back to 0.8 if no loudness data is available.
-  const _loudnessValues = (window.TRACK_DATA?.tracks ?? [])
-    .map(t => t.loudness_db)
-    .filter(v => v != null);
-  const _maxGain = Math.pow(10, (_TARGET_LUFS - Math.min(..._loudnessValues)) / 20);
-  const _BASE_VOLUME = _loudnessValues.length > 0
-    ? Math.min(1.0 / _maxGain, 1.0)
-    : 0.8;
-
-  function _normalizedVolume(track) {
-    if (track.loudness_db == null) return _BASE_VOLUME;
-    const gainDb = _TARGET_LUFS - track.loudness_db;
-    return Math.min(_BASE_VOLUME * Math.pow(10, gainDb / 20), 1.0);
-  }
-
   // Promise + resolver so external code can await SDK readiness.
   let _resolveReady;
   const _readyPromise = new Promise(resolve => { _resolveReady = resolve; });
@@ -199,10 +176,5 @@ const Player = (() => {
     _previousPosition = 0;
   }
 
-  /** Adjust playback volume to loudness-normalize the given track. */
-  async function setTrackVolume(track) {
-    if (_player) await _player.setVolume(_normalizedVolume(track));
-  }
-
-  return { init, waitForReady, getDeviceId, getCurrentState, pause, resume, togglePlayPause, resetPositionTracking, setTrackVolume };
+  return { init, waitForReady, getDeviceId, getCurrentState, pause, resume, togglePlayPause, resetPositionTracking };
 })();
