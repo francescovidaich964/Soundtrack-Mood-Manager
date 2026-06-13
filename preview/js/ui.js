@@ -550,8 +550,8 @@ const UI = (() => {
     document.getElementById("btn-next")
       ?.addEventListener("click", () => _onNext && _onNext());
 
-    // Hide the "run sync first" overlay if at least one playlist is available.
-    if (window.TRACK_DATA?.playlists && Object.keys(window.TRACK_DATA.playlists).length > 0) {
+    // Hide the "run sync first" overlay if data is available.
+    if (window.TRACK_DATA && window.TRACK_DATA.tracks) {
       document.getElementById("no-data-overlay")?.remove();
     }
 
@@ -604,15 +604,5 @@ const UI = (() => {
     return { ..._currentPoint };
   }
 
-  /**
-   * Replace the active MoodSelector and redraw the canvas.
-   * Called when the user switches playlists.
-   * @param {MoodSelector} newSelector
-   */
-  function setTracks(newSelector) {
-    _moodSelector = newSelector;
-    _draw();
-  }
-
-  return { init, onPlayerStateChanged, showError, getCurrentPoint, setTracks };
+  return { init, onPlayerStateChanged, showError, getCurrentPoint };
 })();
