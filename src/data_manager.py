@@ -51,13 +51,24 @@ window.TRACK_DATA = {json_body};
 # ---------------------------------------------------------------------------
 
 def normalize_playlist_id(raw: str) -> str:
-    """Accept a full Spotify URL, URI, or bare ID and return the bare ID."""
+    """Accept a full Spotify URL, URI, or bare ID and return the bare ID.
+
+    Raises ValueError if the URL points to a non-playlist resource (e.g. album).
+    """
+    raw = raw.strip()
+    # Catch common mistake of passing an album/track/artist URL
+    for kind in ("album", "track", "artist", "episode", "show"):
+        if f"open.spotify.com/{kind}/" in raw or raw.startswith(f"spotify:{kind}:"):
+            raise ValueError(
+                f"Expected a playlist URL or ID but got a Spotify {kind} link.\n"
+                f"Open the playlist in Spotify -> Share -> Copy link, and use that URL."
+            )
     if "open.spotify.com/playlist/" in raw:
         raw = raw.split("open.spotify.com/playlist/")[1]
         raw = raw.split("?")[0]
     elif raw.startswith("spotify:playlist:"):
         raw = raw.split(":")[-1]
-    return raw.strip()
+    return raw
 
 
 # ---------------------------------------------------------------------------

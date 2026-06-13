@@ -47,19 +47,35 @@ class SpotifyClient:
     def get_playlist_tracks(self, playlist_id: str) -> list[dict]:
         """Return all tracks in the playlist.
 
-        Uses GET /playlists/{id} to avoid the restricted /items endpoint.
+        Uses GET /playlists/{id} whose response embeds the first track page.
         Handles pagination transparently. Skips local files and episodes.
+
+        Raises PermissionError for playlists not owned by the authenticated user
+        when the app is in Spotify Development Mode (embedded tracks are null and
+        the /items endpoint returns 403).
 
         Returns a list of dicts: track_id, uri, title, artist, album_art_url, duration_ms
         """
         playlist_id = self._normalize_playlist_id(playlist_id)
         tracks: list[dict] = []
 
-        # GET /playlists/{id} embeds the first track page in its response.
-        # Spotify uses 'tracks' or 'items' as the outer key depending on the
-        # playlist type; each entry uses 'track' or 'item' for the track data.
+        # GET /playlists/{id} embeds the first track page.
+        # Spotify uses 'tracks' or 'items' as the outer key (changed ~2024);
+        # each entry uses 'track' or 'item' for the nested track object.
         result = self._fetch_with_retry(self._sp.playlist, playlist_id, market="from_token")
-        page = result.get("tracks") or result.get("items") or {}
+        page = result.get("tracks") or result.get("items")
+
+        if page is None:
+            # Spotify Dev Mode returns null for playlists not owned by the
+            # authenticated user. The /items endpoint also returns 403 in this
+            # mode, so there is no workaround short of Extended Quota Mode.
+            owner = result.get("owner", {}).get("display_name") or result.get("owner", {}).get("id", "unknown")
+            raise PermissionError(
+                f"Cannot read tracks for playlist '{result.get('name')}' (owner: {owner}).\n"
+                "Spotify's Development Mode only allows reading tracks from playlists\n"
+                "owned by the authenticated user. To sync playlists you don't own,\n"
+                "apply for Extended Quota Mode at https://developer.spotify.com/dashboard."
+            )
 
         while page:
             for item in page.get("items", []):

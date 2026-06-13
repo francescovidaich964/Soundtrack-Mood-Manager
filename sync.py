@@ -190,6 +190,11 @@ def main() -> None:
             "ERROR: No playlist ID provided.\n"
             "Pass --playlist <url-or-id>, or add playlist_id to config.json."
         )
+    try:
+        from src.data_manager import normalize_playlist_id
+        playlist_id = normalize_playlist_id(playlist_id)
+    except ValueError as e:
+        sys.exit(f"ERROR: {e}")
     if not args.playlist and os.environ.get("SPOTIFY_PLAYLIST_ID"):
         print(
             "  NOTE: Using SPOTIFY_PLAYLIST_ID secret. Consider passing the playlist ID\n"
@@ -215,7 +220,10 @@ def main() -> None:
         refresh_token=config.get("refresh_token"),
     )
     playlist_name = client.get_playlist_name(playlist_id)
-    remote_tracks = client.get_playlist_tracks(playlist_id)
+    try:
+        remote_tracks = client.get_playlist_tracks(playlist_id)
+    except PermissionError as e:
+        sys.exit(f"ERROR: {e}")
     print(f"  Playlist: '{playlist_name}' — {len(remote_tracks)} tracks")
 
     if not remote_tracks:
