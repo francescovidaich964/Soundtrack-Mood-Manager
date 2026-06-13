@@ -7,9 +7,9 @@ Results collected from notebook runs on 2025-06-07.
 
 | ID | Model | Notebook | Notes |
 |----|-------|----------|-------|
-| **A** | Essentia EmoMusic (production) | `01_essentia_benchmark.ipynb` | MusiCNN + EmoMusic head; CPU |
+| **A** | Essentia EmoMusic (production) | `01_essentia_emomusic.ipynb` | MusiCNN + EmoMusic head; CPU |
 | **B** | Essentia + Valence Correction | `01c_essentia_valence_key_correction.ipynb` | Same backbone, corrected valence column mapping; CPU |
-| **C** | music2emo | `02_music2emo_benchmark.ipynb` | MERT + chord/key features; CPU (GPU failed: P100 sm_60 incompatible) |
+| **C** | music2emo | `02_music2emo.ipynb` | MERT + chord/key features; CPU (GPU failed: P100 sm_60 incompatible) |
 
 Arousal results for **A** and **B** are identical — the correction only affects valence.
 
