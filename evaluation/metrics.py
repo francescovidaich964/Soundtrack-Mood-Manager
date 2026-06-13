@@ -89,3 +89,36 @@ def print_metrics(df: pd.DataFrame, title: str = "") -> None:
             table = pd.DataFrame(rows).to_string(index=False)
             for line in table.split("\n"):
                 print(indent + line)
+
+
+def print_summary(all_results: dict, spot_df: pd.DataFrame,
+                  prof: dict | None, model_tag: str) -> None:
+    """Print the full benchmark summary (dataset metrics, spot-checks, runtime)."""
+    width = 60
+    print("=" * width)
+    print(f"{model_tag.upper()} — BENCHMARK SUMMARY")
+    print("=" * width)
+
+    print("\n── Dataset metrics ──")
+    if all_results:
+        combined = pd.concat(all_results.values())
+        print_metrics(combined, "all datasets")
+    else:
+        print("  (no datasets evaluated)")
+
+    print("\n── Spot-checks ──")
+    if not spot_df.empty:
+        display_cols = [c for c in ["title", "exp_valence", "exp_arousal",
+                                    "valence", "arousal", "moods"]
+                        if c in spot_df.columns]
+        print(spot_df[display_cols].to_string(index=False, float_format="{:.2f}".format))
+    else:
+        print("  (none run)")
+
+    print("\n── Runtime ──")
+    if prof is not None:
+        print(f"  {prof['mean_s']:.2f} s/track  (peak RAM {prof['peak_mb']:.1f} MB)")
+    else:
+        print("  (run Section 7 to profile)")
+
+    print("\n" + "=" * width)

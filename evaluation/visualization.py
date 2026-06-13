@@ -127,3 +127,43 @@ def cross_dataset_comparison(df: pd.DataFrame) -> None:
     plt.savefig("cross_dataset_comparison.png", dpi=120, bbox_inches="tight")
     plt.show()
     print("Saved: cross_dataset_comparison.png")
+
+
+def plot_spot_checks(spot_df: pd.DataFrame, model_tag: str) -> None:
+    """Mood-space scatter of spot-check predictions vs expected positions.
+
+    ★ = expected position, ● = predicted position, arrow shows the error.
+    Saves <model_tag>_spotchecks.png.
+    """
+    if spot_df.empty:
+        print("No spot-check results to plot.")
+        return
+    colors = plt.cm.tab10(np.linspace(0, 0.9, len(spot_df)))
+    fig, ax = plt.subplots(figsize=(7, 7))
+    ax.set_xlim(-0.05, 1.05)
+    ax.set_ylim(-0.05, 1.05)
+    ax.axhline(0.5, color="#ccc", lw=0.8, ls="--")
+    ax.axvline(0.5, color="#ccc", lw=0.8, ls="--")
+    ax.text(0.02, 0.98, "sad/energetic",  transform=ax.transAxes, va="top",    fontsize=8, color="#999")
+    ax.text(0.98, 0.98, "happy/energetic", transform=ax.transAxes, va="top",    ha="right", fontsize=8, color="#999")
+    ax.text(0.02, 0.02, "sad/calm",        transform=ax.transAxes, va="bottom", fontsize=8, color="#999")
+    ax.text(0.98, 0.02, "happy/calm",      transform=ax.transAxes, va="bottom", ha="right", fontsize=8, color="#999")
+    for i, row in spot_df.iterrows():
+        c = colors[i]
+        ax.scatter(row["exp_valence"], row["exp_arousal"], marker="*", s=220, color=c, zorder=4)
+        if not pd.isna(row["valence"]):
+            ax.scatter(row["valence"], row["arousal"], marker="o", s=70,
+                       color=c, edgecolors="black", lw=0.5, zorder=4)
+            ax.annotate("", xy=(row["valence"], row["arousal"]),
+                        xytext=(row["exp_valence"], row["exp_arousal"]),
+                        arrowprops=dict(arrowstyle="->", color=c, lw=1.0))
+        ax.annotate(row["title"], xy=(row["exp_valence"], row["exp_arousal"]),
+                    xytext=(5, 5), textcoords="offset points", fontsize=7, color=c)
+    ax.set_xlabel("Valence (sad → happy)")
+    ax.set_ylabel("Arousal (calm → energetic)")
+    ax.set_title(f"{model_tag} — Spot-checks\n★ = expected  ● = predicted")
+    plt.tight_layout()
+    fname = f"{model_tag}_spotchecks.png"
+    plt.savefig(fname, dpi=120, bbox_inches="tight")
+    plt.show()
+    print(f"Saved: {fname}")

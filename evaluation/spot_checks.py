@@ -194,3 +194,57 @@ def profile_predictor(predictor_fn, audio_path, n: int = 5) -> dict:
         "std_s":   float(np.std(times)),
         "peak_mb": peak / 1e6,
     }
+
+
+# ── Notebook helpers ──────────────────────────────────────────────────────────
+
+def run_spot_checks(predictor_fn, spotcheck_dir: Path) -> pd.DataFrame:
+    """Run predictor_fn on all available SPOT_CHECKS tracks; return results DataFrame.
+
+    Call download_spot_checks(spotcheck_dir) in the cell before this one to
+    ensure the audio files are present.
+
+    The returned DataFrame always has: title, exp_valence, exp_arousal, valence, arousal.
+    A 'moods' column is appended when predictor_fn returns that key (e.g. music2emo).
+    """
+    rows = []
+    for track in SPOT_CHECKS:
+        audio = Path(spotcheck_dir) / f"{track['title']}.mp3"
+        if not audio.exists():
+            print(f"  ✗ {track['title']} — not found, skipping")
+            continue
+        pred = predictor_fn(audio)
+        row: dict = {
+            "title":       track["title"].replace("_", " "),
+            "exp_valence": track["exp_valence"],
+            "exp_arousal": track["exp_arousal"],
+            "valence":     pred["valence"] if pred else float("nan"),
+            "arousal":     pred["arousal"] if pred else float("nan"),
+        }
+        if pred and "moods" in pred:
+            row["moods"] = ", ".join((pred.get("moods") or [])[:4])
+        rows.append(row)
+
+        name = track["title"].replace("_", " ").title()
+        print(f"\n{name}")
+        print(f"  Expected:  v={track['exp_valence']:.2f}  a={track['exp_arousal']:.2f}")
+        if pred:
+            extra = f"  moods=[{row.get('moods', '')}]" if "moods" in row else ""
+            print(f"  Predicted: v={pred['valence']:.2f}  a={pred['arousal']:.2f}{extra}")
+        else:
+            print("  Predicted: FAILED")
+
+    spot_df = pd.DataFrame(rows)
+    print(f"\nCompleted {len(spot_df)} spot-checks.")
+    return spot_df
+
+
+def save_results(all_results: dict, model_tag: str) -> None:
+    """Concatenate all_results DataFrames and save to <model_tag>_results.csv."""
+    if not all_results:
+        print("No results to save — check that audio directories exist.")
+        return
+    combined = pd.concat(all_results.values())
+    out = f"{model_tag}_results.csv"
+    combined.to_csv(out, index=False)
+    print(f"Saved: {out}  ({len(combined)} rows)")

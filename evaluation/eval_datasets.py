@@ -243,3 +243,59 @@ def setup_merge(data_dir: Path, download_audio: bool = True) -> tuple:
     aro_col = "Arousal"
     print(f"MERGE: {len(df)} rows  id={id_col!r}  valence={val_col!r}  arousal={aro_col!r}")
     return df, id_col, val_col, aro_col
+
+
+# ── Notebook helpers ──────────────────────────────────────────────────────────
+
+def detect_audio_paths(data_dir: Path) -> dict:
+    """Return audio directory paths for all datasets, detected via rglob.
+
+    DEAM extracts to MEMD_audio/, PMEmo to PMEmo2019/chorus/, MERGE keeps its
+    own MERGE_Audio_Balanced/ root. Falls back to a fixed default path when the
+    directory is not yet present so callers can still construct DATASETS tuples
+    before audio is downloaded.
+    """
+    data_dir = Path(data_dir)
+
+    _deam = next(iter(sorted((data_dir / "deam").rglob("MEMD_audio"))), None) \
+        if (data_dir / "deam").exists() else None
+    _pmemo = next(iter(sorted((data_dir / "pmemo").rglob("chorus"))), None) \
+        if (data_dir / "pmemo").exists() else None
+    _merge = next(iter(sorted((data_dir / "merge").rglob("MERGE_Audio_Balanced"))), None) \
+        if (data_dir / "merge").exists() else None
+
+    paths = {
+        "DEAM":     _deam    or data_dir / "deam"    / "MEMD_audio",
+        "EmoMusic": data_dir / "emomusic" / "clips",
+        "PMEmo":    _pmemo   or data_dir / "pmemo"   / "chorus",
+        "MERGE":    _merge   or data_dir / "merge"   / "MERGE_Audio_Balanced",
+    }
+
+    for name, path in paths.items():
+        if path.exists():
+            print(f"{name} audio : {path}")
+
+    return paths
+
+
+def download_model_files(model_urls: dict, models_dir: Path) -> None:
+    """Download model files listed in model_urls, skipping any already cached.
+
+    Args:
+        model_urls: {filename: url} mapping.
+        models_dir: Directory to download into.
+    """
+    models_dir = Path(models_dir)
+    models_dir.mkdir(exist_ok=True)
+    for name, url in model_urls.items():
+        dest = models_dir / name
+        if dest.exists():
+            print(f"  ✓ {name} ({dest.stat().st_size / 1e6:.1f} MB, cached)")
+            continue
+        print(f"Downloading {name}...", end=" ", flush=True)
+        r = requests.get(url, stream=True, timeout=120)
+        r.raise_for_status()
+        with open(dest, "wb") as f:
+            for chunk in r.iter_content(65536):
+                f.write(chunk)
+        print(f"{dest.stat().st_size / 1e6:.1f} MB")
