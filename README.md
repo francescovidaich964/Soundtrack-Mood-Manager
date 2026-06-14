@@ -195,8 +195,8 @@ pip install -r requirements.txt
 mkdir -p models
 curl -L -o models/msd-musicnn-1.pb \
   https://essentia.upf.edu/models/feature-extractors/musicnn/msd-musicnn-1.pb
-curl -L -o models/emomusic-msd-musicnn-2.pb \
-  https://essentia.upf.edu/models/classification-heads/emomusic/emomusic-msd-musicnn-2.pb
+curl -L -o models/deam-msd-musicnn-2.pb \
+  https://essentia.upf.edu/models/classification-heads/deam/deam-msd-musicnn-2.pb
 
 # 3. Fill in config.json (client_id, client_secret, playlist_id, refresh_token)
 cp config.json.example config.json

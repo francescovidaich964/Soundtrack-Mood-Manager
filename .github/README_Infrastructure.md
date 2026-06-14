@@ -132,7 +132,7 @@ Two independent caches, managed by `actions/cache@v4` in sync.yml:
 
 | Cache | Key | What it stores | Why |
 |-------|-----|----------------|-----|
-| Essentia models | `essentia-models-msd-musicnn-1-emomusic-msd-musicnn-2` | `models/*.pb` (~3 MB total) | Avoid re-downloading TF model files on every sync run |
+| Essentia models | `essentia-models-msd-musicnn-1-deam-msd-musicnn-2` | `models/*.pb` (~3 MB total) | Avoid re-downloading TF model files on every sync run |
 | pip packages | `pip-<hash of requirements.txt>` | `~/.cache/pip` | Avoid re-downloading Python dependencies; key rotates when requirements.txt changes |
 
 These caches live in GitHub's cache storage (separate from the repo). They are scoped to the repository and shared across all branches and workflow runs.

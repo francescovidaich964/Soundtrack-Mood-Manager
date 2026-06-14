@@ -12,7 +12,7 @@ Model output column order (verified against Essentia model zoo docs):
   column 0 = valence   (negative ↔ positive)
   column 1 = arousal   (calm ↔ energetic)  — used as "energy" throughout
 
-Raw prediction range is approximately [1.0, 9.0] (EmoMusic dataset scale).
+Raw prediction range is approximately [1.0, 9.0] (DEAM dataset scale).
 After normalization the values are clipped to [0.0, 1.0] to guard against
 occasional out-of-range predictions at the extremes.
 
@@ -60,7 +60,7 @@ _TensorflowPredict2D = None
 
 # Loaded model instances (one per process).
 _musicnn_model = None
-_emomusic_model = None
+_deam_model = None
 _key_extractor = None
 _models_dir_loaded: Path | None = None
 
@@ -68,7 +68,7 @@ _models_dir_loaded: Path | None = None
 def _load_models(models_dir: Path) -> None:
     """Import Essentia and instantiate both models (idempotent)."""
     global _MonoLoader, _TensorflowPredictMusiCNN, _TensorflowPredict2D
-    global _musicnn_model, _emomusic_model, _key_extractor, _models_dir_loaded
+    global _musicnn_model, _deam_model, _key_extractor, _models_dir_loaded
 
     if _models_dir_loaded == models_dir:
         return  # already loaded
@@ -92,9 +92,9 @@ def _load_models(models_dir: Path) -> None:
         ) from exc
 
     musicnn_pb = models_dir / "msd-musicnn-1.pb"
-    emomusic_pb = models_dir / "emomusic-msd-musicnn-2.pb"
+    deam_pb    = models_dir / "deam-msd-musicnn-2.pb"
 
-    for pb in (musicnn_pb, emomusic_pb):
+    for pb in (musicnn_pb, deam_pb):
         if not pb.exists():
             raise FileNotFoundError(
                 f"Model file not found: {pb}\n"
@@ -108,9 +108,9 @@ def _load_models(models_dir: Path) -> None:
             graphFilename=str(musicnn_pb),
             output="model/dense/BiasAdd",  # verified against Essentia model zoo docs
         )
-        _emomusic_model = TensorflowPredict2D(
-            graphFilename=str(emomusic_pb),
-            output="model/Identity",        # verified against Essentia model zoo docs
+        _deam_model = TensorflowPredict2D(
+            graphFilename=str(deam_pb),
+            output="model/Identity",       # verified against Essentia model zoo docs
         )
 
     _MonoLoader = MonoLoader
@@ -158,9 +158,9 @@ def analyze(audio_path: Path, models_dir: Path) -> tuple[float, float, float, fl
         if embeddings.shape[0] == 0:
             return None  # audio too short to produce any frames
 
-        # 3. EmoMusic predictions: shape (N_frames, 2)
+        # 3. DEAM predictions: shape (N_frames, 2)
         #    Column 0 = valence, Column 1 = arousal (energy)
-        predictions = _emomusic_model(embeddings)
+        predictions = _deam_model(embeddings)
 
         if predictions.shape[0] == 0:
             return None
@@ -168,7 +168,7 @@ def analyze(audio_path: Path, models_dir: Path) -> tuple[float, float, float, fl
         # 4. Mean over frames → [valence_mean, arousal_mean]
         mean = predictions.mean(axis=0)  # shape (2,)
 
-        # 5. Normalize from EmoMusic scale [1, 9] → [0, 1] and clip.
+        # 5. Normalize from DEAM scale [1, 9] → [0, 1] and clip.
         valence = float(np.clip((mean[0] - 1.0) / 8.0, 0.0, 1.0))
         energy  = float(np.clip((mean[1] - 1.0) / 8.0, 0.0, 1.0))
 

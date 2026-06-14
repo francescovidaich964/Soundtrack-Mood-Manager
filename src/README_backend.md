@@ -95,9 +95,9 @@ Extracts `valence` and `energy` from an audio file using two Essentia TensorFlow
 **Pipeline:**
 1. Load audio as 16 kHz mono
 2. `TensorflowPredictMusiCNN` (`msd-musicnn-1.pb`) → embeddings of shape `(N_frames, 200)`
-3. `TensorflowPredict2D` (`emomusic-msd-musicnn-2.pb`) → predictions of shape `(N_frames, 2)`
+3. `TensorflowPredict2D` (`deam-msd-musicnn-2.pb`) → predictions of shape `(N_frames, 2)`
 4. Mean over frames → `[valence_mean, arousal_mean]`
-5. Normalize from EmoMusic scale `[1, 9]` → `[0.0, 1.0]`
+5. Normalize from DEAM scale `[1, 9]` → `[0.0, 1.0]`
 
 Column 0 = valence (negative ↔ positive), column 1 = arousal (calm ↔ energetic, used as "energy").
 
