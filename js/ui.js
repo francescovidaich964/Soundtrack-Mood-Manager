@@ -67,6 +67,9 @@ const UI = (() => {
   let _hoveredTrack = null;
   let _mousePos     = { x: 0, y: 0 };
 
+  // Key-correction toggle
+  let _applyKeyCorrection = true;
+
   // Callbacks
   let _onPointChanged  = null;  // (x, y) => void — called while dragging
   let _onPlayPause     = null;  // () => void
@@ -155,7 +158,7 @@ const UI = (() => {
 
     // --- Track dots (drawn in screen space so size is constant regardless of zoom) ---
     for (const track of tracks) {
-      const { x, y } = _toCanvas(track.valence, track.energy);
+      const { x, y } = _toCanvas(effectiveValence(track, _applyKeyCorrection), track.energy);
       const { sx, sy } = _worldToScreen(x, y);
       const isPlaying = track.track_id === _playingTrackId;
       const isHovered = _hoveredTrack && track.track_id === _hoveredTrack.track_id;
@@ -243,7 +246,7 @@ const UI = (() => {
     // Track dots
     for (const t of _moodSelector.getTracks()) {
       _ctx.beginPath();
-      _ctx.arc(mx + t.valence * M, my + (1 - t.energy) * M, 1.5, 0, Math.PI * 2);
+      _ctx.arc(mx + effectiveValence(t, _applyKeyCorrection) * M, my + (1 - t.energy) * M, 1.5, 0, Math.PI * 2);
       _ctx.fillStyle = t.track_id === _playingTrackId
         ? "rgba(201,168,76,0.9)"
         : "rgba(201,168,76,0.35)";
@@ -283,7 +286,7 @@ const UI = (() => {
     let bestDist = threshold;
 
     for (const t of _moodSelector.getTracks()) {
-      const pos = _toCanvas(t.valence, t.energy);
+      const pos = _toCanvas(effectiveValence(t, _applyKeyCorrection), t.energy);
       const d2  = (pos.x - wcx) ** 2 + (pos.y - wcy) ** 2;
       if (d2 < bestDist) {
         bestDist = d2;
@@ -524,14 +527,12 @@ const UI = (() => {
 
   /**
    * Initialize the UI.
-   * @param {MoodSelector} moodSelector
    * @param {function} onPointChanged  (x, y) => void — cursor moved
    * @param {function} onPlayPause     () => void
    * @param {function} onNext          () => void
    * @param {function} onSeek          (positionMs) => void
    */
-  function init(moodSelector, onPointChanged, onPlayPause, onNext, onSeek) {
-    _moodSelector    = moodSelector;
+  function init(onPointChanged, onPlayPause, onNext, onSeek) {
     _onPointChanged  = onPointChanged;
     _onPlayPause     = onPlayPause;
     _onNext          = onNext;
@@ -549,6 +550,15 @@ const UI = (() => {
       ?.addEventListener("click", () => _onPlayPause && _onPlayPause());
     document.getElementById("btn-next")
       ?.addEventListener("click", () => _onNext && _onNext());
+
+    const chkKeyCorrection = document.getElementById("chk-key-correction");
+    if (chkKeyCorrection) {
+      chkKeyCorrection.addEventListener("change", () => {
+        _applyKeyCorrection = chkKeyCorrection.checked;
+        if (_moodSelector) _moodSelector.setKeyCorrection(_applyKeyCorrection);
+        _draw();
+      });
+    }
 
     // Hide the "run sync first" overlay if at least one playlist is available.
     if (window.TRACK_DATA?.playlists && Object.keys(window.TRACK_DATA.playlists).length > 0) {
@@ -611,6 +621,7 @@ const UI = (() => {
    */
   function setTracks(newSelector) {
     _moodSelector = newSelector;
+    _moodSelector.setKeyCorrection(_applyKeyCorrection);
     _draw();
   }
 

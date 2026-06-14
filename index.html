@@ -55,6 +55,12 @@
 
     <!-- ---- Playlist info ---- -->
     <footer class="playlist-info" id="playlist-info">
+      <div class="key-correction-row">
+        <label>
+          <input type="checkbox" id="chk-key-correction" checked>
+          Key correction
+        </label>
+      </div>
       <div class="playlist-selector-row">
         <select id="playlist-select" aria-label="Select playlist"></select>
         <span id="playlist-track-count"></span>
@@ -149,6 +155,7 @@
           .filter(Boolean);
 
         selector = new MoodSelector(playlistTracks);
+        Player.setPlaylistTracks(playlistTracks);
 
         if (countEl) {
           const n = selector.count;
@@ -159,21 +166,8 @@
         UI.setTracks(selector);
       }
 
-      // Load the first playlist immediately.
-      const firstPlaylistId = Object.keys(playlists)[0];
-      loadPlaylist(firstPlaylistId);
-
-      if (!selector || selector.count === 0) {
-        UI.showError(
-          "No analyzed tracks found in data.js.\n" +
-          "Re-run the Sync Playlist workflow with force_reanalyze enabled."
-        );
-        return;
-      }
-
       // ---- 5. UI init ----
       UI.init(
-        selector,
         /* onPointChanged */ (_x, _y) => { /* cursor updated internally */ },
 
         /* onPlayPause */ async () => {
@@ -214,6 +208,18 @@
           await SpotifyAPI.seekTo(positionMs);
         },
       );
+
+      // Load the first playlist now that UI canvas is initialized.
+      const firstPlaylistId = Object.keys(playlists)[0];
+      loadPlaylist(firstPlaylistId);
+
+      if (!selector || selector.count === 0) {
+        UI.showError(
+          "No analyzed tracks found in data.js.\n" +
+          "Re-run the Sync Playlist workflow with force_reanalyze enabled."
+        );
+        return;
+      }
 
       // ---- 6. Playlist switcher ----
       selectEl.addEventListener('change', async () => {

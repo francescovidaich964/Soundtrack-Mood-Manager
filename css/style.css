@@ -257,6 +257,23 @@ button:active {
   white-space: nowrap;
 }
 
+.key-correction-row {
+  font-size: 0.82rem;
+  color: rgba(232,224,208,0.45);
+}
+
+.key-correction-row label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+}
+
+.key-correction-row input[type="checkbox"] {
+  accent-color: #c9a84c;
+  cursor: pointer;
+}
+
 #playlist-id {
   font-family: "Courier New", monospace;
   font-size: 0.68rem;
