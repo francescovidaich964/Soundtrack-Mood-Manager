@@ -83,7 +83,7 @@
     8. app.js (inline) — wires everything together
     9. Spotify SDK  — async so it doesn't block; triggers onSpotifyWebPlaybackSDKReady
   -->
-  <script defer src="data.js?v=20260614110237"></script>
+  <script defer src="data.js"></script>
   <script defer src="js/build-info.js"></script>
   <script defer src="js/config.js"></script>
   <script defer src="js/auth.js"></script>
@@ -155,6 +155,7 @@
           .filter(Boolean);
 
         selector = new MoodSelector(playlistTracks);
+        Player.setPlaylistTracks(playlistTracks);
 
         if (countEl) {
           const n = selector.count;
@@ -165,21 +166,8 @@
         UI.setTracks(selector);
       }
 
-      // Load the first playlist immediately.
-      const firstPlaylistId = Object.keys(playlists)[0];
-      loadPlaylist(firstPlaylistId);
-
-      if (!selector || selector.count === 0) {
-        UI.showError(
-          "No analyzed tracks found in data.js.\n" +
-          "Re-run the Sync Playlist workflow with force_reanalyze enabled."
-        );
-        return;
-      }
-
       // ---- 5. UI init ----
       UI.init(
-        selector,
         /* onPointChanged */ (_x, _y) => { /* cursor updated internally */ },
 
         /* onPlayPause */ async () => {
@@ -220,6 +208,18 @@
           await SpotifyAPI.seekTo(positionMs);
         },
       );
+
+      // Load the first playlist now that UI canvas is initialized.
+      const firstPlaylistId = Object.keys(playlists)[0];
+      loadPlaylist(firstPlaylistId);
+
+      if (!selector || selector.count === 0) {
+        UI.showError(
+          "No analyzed tracks found in data.js.\n" +
+          "Re-run the Sync Playlist workflow with force_reanalyze enabled."
+        );
+        return;
+      }
 
       // ---- 6. Playlist switcher ----
       selectEl.addEventListener('change', async () => {

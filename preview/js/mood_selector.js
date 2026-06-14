@@ -1,4 +1,16 @@
 /**
+ * Returns the effective valence for a track, applying the key-mode correction at
+ * runtime when applyCorrection is true. Shared by MoodSelector and UI.
+ * @param {Object}  track           Track object with valence and valence_key_correction.
+ * @param {boolean} applyCorrection Whether to add the key-mode delta.
+ * @returns {number} Effective valence ∈ [0, 1].
+ */
+function effectiveValence(track, applyCorrection) {
+  if (!applyCorrection || track.valence_key_correction == null) return track.valence;
+  return Math.max(0, Math.min(1, track.valence + track.valence_key_correction));
+}
+
+/**
  * mood_selector.js — greedy nearest-neighbor selection on the 2D mood plane
  *
  * Tracks are plotted at (valence, energy) ∈ [0,1]².
@@ -32,11 +44,8 @@ class MoodSelector {
     this._applyKeyCorrection = true;
   }
 
-  /** Returns effective valence for sorting: raw if correction is off and available. */
   _eff(track) {
-    return (!this._applyKeyCorrection && Number.isFinite(track.valence_raw))
-      ? track.valence_raw
-      : track.valence;
+    return effectiveValence(track, this._applyKeyCorrection);
   }
 
   /**

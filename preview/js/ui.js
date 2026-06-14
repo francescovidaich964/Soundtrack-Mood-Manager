@@ -70,13 +70,6 @@ const UI = (() => {
   // Key-correction toggle
   let _applyKeyCorrection = true;
 
-  // Returns effective valence: raw (pre-correction) if toggle is off and field is available.
-  function _eff(track) {
-    return (!_applyKeyCorrection && Number.isFinite(track.valence_raw))
-      ? track.valence_raw
-      : track.valence;
-  }
-
   // Callbacks
   let _onPointChanged  = null;  // (x, y) => void — called while dragging
   let _onPlayPause     = null;  // () => void
@@ -165,7 +158,7 @@ const UI = (() => {
 
     // --- Track dots (drawn in screen space so size is constant regardless of zoom) ---
     for (const track of tracks) {
-      const { x, y } = _toCanvas(_eff(track), track.energy);
+      const { x, y } = _toCanvas(effectiveValence(track, _applyKeyCorrection), track.energy);
       const { sx, sy } = _worldToScreen(x, y);
       const isPlaying = track.track_id === _playingTrackId;
       const isHovered = _hoveredTrack && track.track_id === _hoveredTrack.track_id;
@@ -534,14 +527,12 @@ const UI = (() => {
 
   /**
    * Initialize the UI.
-   * @param {MoodSelector} moodSelector
    * @param {function} onPointChanged  (x, y) => void — cursor moved
    * @param {function} onPlayPause     () => void
    * @param {function} onNext          () => void
    * @param {function} onSeek          (positionMs) => void
    */
-  function init(moodSelector, onPointChanged, onPlayPause, onNext, onSeek) {
-    _moodSelector    = moodSelector;
+  function init(onPointChanged, onPlayPause, onNext, onSeek) {
     _onPointChanged  = onPointChanged;
     _onPlayPause     = onPlayPause;
     _onNext          = onNext;

@@ -32,21 +32,21 @@ const Player = (() => {
 
   const _TARGET_LUFS = -14.0;
 
-  // Compute a base volume so the quietest track in the playlist maps to 1.0,
-  // ensuring no track ever needs to be clamped when boosted to target LUFS.
-  // Falls back to 0.8 if no loudness data is available.
-  const _loudnessValues = Object.values(window.TRACK_DATA?.tracks ?? {})
-    .map(t => t.loudness_db)
-    .filter(v => v != null);
-  const _maxGain = Math.pow(10, (_TARGET_LUFS - Math.min(..._loudnessValues)) / 20);
-  const _BASE_VOLUME = _loudnessValues.length > 0
-    ? Math.min(1.0 / _maxGain, 1.0)
-    : 0.8;
+  // Recomputed per playlist via setPlaylistTracks(). Falls back to 0.8 until set.
+  let _baseVolume = 0.8;
+
+  function _computeBaseVolume(tracks) {
+    const loudnessValues = tracks.map(t => t.loudness_db).filter(v => v != null);
+    if (loudnessValues.length === 0) return 0.8;
+    const minLufs = loudnessValues.reduce((a, b) => Math.min(a, b), Infinity);
+    const maxGain = Math.pow(10, (_TARGET_LUFS - minLufs) / 20);
+    return Math.min(1.0 / maxGain, 1.0);
+  }
 
   function _normalizedVolume(track) {
-    if (track.loudness_db == null) return _BASE_VOLUME;
+    if (track.loudness_db == null) return _baseVolume;
     const gainDb = _TARGET_LUFS - track.loudness_db;
-    return Math.min(_BASE_VOLUME * Math.pow(10, gainDb / 20), 1.0);
+    return Math.min(_baseVolume * Math.pow(10, gainDb / 20), 1.0);
   }
 
   // Promise + resolver so external code can await SDK readiness.
@@ -204,5 +204,10 @@ const Player = (() => {
     if (_player) await _player.setVolume(_normalizedVolume(track));
   }
 
-  return { init, waitForReady, getDeviceId, getCurrentState, pause, resume, togglePlayPause, resetPositionTracking, setTrackVolume };
+  /** Recompute the per-playlist loudness base whenever the active playlist changes. */
+  function setPlaylistTracks(tracks) {
+    _baseVolume = _computeBaseVolume(tracks);
+  }
+
+  return { init, waitForReady, getDeviceId, getCurrentState, pause, resume, togglePlayPause, resetPositionTracking, setTrackVolume, setPlaylistTracks };
 })();
