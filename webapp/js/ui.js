@@ -246,7 +246,7 @@ const UI = (() => {
     // Track dots
     for (const t of _moodSelector.getTracks()) {
       _ctx.beginPath();
-      _ctx.arc(mx + _eff(t) * M, my + (1 - t.energy) * M, 1.5, 0, Math.PI * 2);
+      _ctx.arc(mx + effectiveValence(t, _applyKeyCorrection) * M, my + (1 - t.energy) * M, 1.5, 0, Math.PI * 2);
       _ctx.fillStyle = t.track_id === _playingTrackId
         ? "rgba(201,168,76,0.9)"
         : "rgba(201,168,76,0.35)";
@@ -286,7 +286,7 @@ const UI = (() => {
     let bestDist = threshold;
 
     for (const t of _moodSelector.getTracks()) {
-      const pos = _toCanvas(_eff(t), t.energy);
+      const pos = _toCanvas(effectiveValence(t, _applyKeyCorrection), t.energy);
       const d2  = (pos.x - wcx) ** 2 + (pos.y - wcy) ** 2;
       if (d2 < bestDist) {
         bestDist = d2;
