@@ -128,9 +128,11 @@ def analyze(audio_path: Path, models_dir: Path) -> tuple[float, float, float | N
         models_dir: Directory containing the .pb model files.
 
     Returns:
-        (valence, energy, loudness_db) where valence/energy are in [0.0, 1.0]
-        and loudness_db is the integrated LUFS of the original audio (before
-        normalization), or None if unmeasurable. Returns None on any failure.
+        (valence, energy, loudness_db, valence_raw, valence_key_correction) where
+        valence/energy/valence_raw are in [0.0, 1.0], loudness_db is the integrated
+        LUFS of the original audio (before normalization) or None if unmeasurable,
+        valence_raw is the pre-correction valence, and valence_key_correction is the
+        unclipped delta applied by the key-mode patch. Returns None on any failure.
     """
     try:
         _load_models(models_dir)
@@ -168,13 +170,14 @@ def analyze(audio_path: Path, models_dir: Path) -> tuple[float, float, float | N
         mean = predictions.mean(axis=0)  # shape (2,)
 
         # 5. Normalize from EmoMusic scale [1, 9] → [0, 1] and clip.
-        valence = float(np.clip((mean[0] - 1.0) / 8.0, 0.0, 1.0))
+        valence_raw = float(np.clip((mean[0] - 1.0) / 8.0, 0.0, 1.0))
         energy = float(np.clip((mean[1] - 1.0) / 8.0, 0.0, 1.0))
 
         # 5b. Key-mode valence correction weighted by key detection confidence.
         #     Full-confidence major: +0.065 | Full-confidence minor: −0.065
         #     Near-zero strength (ambiguous/atonal key): correction ≈ 0
-        valence = float(np.clip(valence + _ALPHA * (is_major - 0.5) * key_strength, 0.0, 1.0))
+        valence_key_correction = float(_ALPHA * (is_major - 0.5) * key_strength)
+        valence = float(np.clip(valence_raw + valence_key_correction, 0.0, 1.0))
 
         # np.clip does not sanitise NaN; guard so callers never store NaN in data.js.
         # (json.dumps writes float('nan') as the bare JS token NaN, which then passes
@@ -182,7 +185,7 @@ def analyze(audio_path: Path, models_dir: Path) -> tuple[float, float, float | N
         if not (math.isfinite(valence) and math.isfinite(energy)):
             return None
 
-        return valence, energy, loudness_db
+        return valence, energy, loudness_db, valence_raw, valence_key_correction
 
     except Exception:  # noqa: BLE001
         # Corrupted audio, model inference error, etc. — skip the track.
