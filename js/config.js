@@ -3,7 +3,7 @@ window.CONFIG = {
   clientId: "d409d7c6580d46e8af531204ac0493f7",
   redirectUri: window.location.origin + window.location.pathname.replace(/index\.html$/, ""),
   scopes: "streaming user-read-email user-read-private user-modify-playback-state user-read-playback-state",
-  playerName: "DnD Player",
+  playerName: "MoodPad",
   sigma: 0.15,
   recentlyPlayedSize: 5,
 };
