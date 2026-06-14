@@ -120,19 +120,18 @@ def _load_models(models_dir: Path) -> None:
     _models_dir_loaded = models_dir
 
 
-def analyze(audio_path: Path, models_dir: Path) -> tuple[float, float, float | None] | None:
-    """Extract (valence, energy, loudness_db) from an audio file.
+def analyze(audio_path: Path, models_dir: Path) -> tuple[float, float, float, float | None] | None:
+    """Extract (valence, energy, valence_key_correction, loudness_db) from an audio file.
 
     Args:
         audio_path: Path to the MP3 (or any format MonoLoader accepts).
         models_dir: Directory containing the .pb model files.
 
     Returns:
-        (valence, energy, loudness_db, valence_raw, valence_key_correction) where
-        valence/energy/valence_raw are in [0.0, 1.0], loudness_db is the integrated
-        LUFS of the original audio (before normalization) or None if unmeasurable,
-        valence_raw is the pre-correction valence, and valence_key_correction is the
-        unclipped delta applied by the key-mode patch. Returns None on any failure.
+        (valence, energy, valence_key_correction, loudness_db) where valence and energy
+        are in [0.0, 1.0], valence_key_correction is the unclipped key-mode delta
+        (added at runtime for the correction toggle), and loudness_db is the integrated
+        LUFS of the original audio or None if unmeasurable. Returns None on any failure.
     """
     try:
         _load_models(models_dir)
@@ -170,22 +169,23 @@ def analyze(audio_path: Path, models_dir: Path) -> tuple[float, float, float | N
         mean = predictions.mean(axis=0)  # shape (2,)
 
         # 5. Normalize from EmoMusic scale [1, 9] → [0, 1] and clip.
-        valence_raw = float(np.clip((mean[0] - 1.0) / 8.0, 0.0, 1.0))
-        energy = float(np.clip((mean[1] - 1.0) / 8.0, 0.0, 1.0))
+        valence = float(np.clip((mean[0] - 1.0) / 8.0, 0.0, 1.0))
+        energy  = float(np.clip((mean[1] - 1.0) / 8.0, 0.0, 1.0))
 
         # 5b. Key-mode valence correction weighted by key detection confidence.
         #     Full-confidence major: +0.065 | Full-confidence minor: −0.065
         #     Near-zero strength (ambiguous/atonal key): correction ≈ 0
+        #     Applied additively at runtime by the webapp; not pre-baked into valence.
         valence_key_correction = float(_ALPHA * (is_major - 0.5) * key_strength)
-        valence = float(np.clip(valence_raw + valence_key_correction, 0.0, 1.0))
 
         # np.clip does not sanitise NaN; guard so callers never store NaN in data.js.
         # (json.dumps writes float('nan') as the bare JS token NaN, which then passes
         # typeof checks but draws at (NaN, NaN) — invisible on the canvas.)
-        if not (math.isfinite(valence) and math.isfinite(energy)):
+        if not (math.isfinite(valence) and math.isfinite(energy)
+                and math.isfinite(valence_key_correction)):
             return None
 
-        return valence, energy, loudness_db, valence_raw, valence_key_correction
+        return valence, energy, valence_key_correction, loudness_db
 
     except Exception:  # noqa: BLE001
         # Corrupted audio, model inference error, etc. — skip the track.

@@ -33,7 +33,7 @@ def main() -> None:
         playlist_id = normalize_playlist_id(args.playlist)
     except ValueError as e:
         sys.exit(f"ERROR: {e}")
-    data_js_path  = REPO_ROOT / "webapp" / "data.js"
+    data_js_path = REPO_ROOT / "webapp" / "data.js"
 
     data = read_data_js(data_js_path)
 
