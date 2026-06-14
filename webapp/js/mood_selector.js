@@ -1,4 +1,16 @@
 /**
+ * Returns the effective valence for a track, applying the key-mode correction at
+ * runtime when applyCorrection is true. Shared by MoodSelector and UI.
+ * @param {Object}  track           Track object with valence and valence_key_correction.
+ * @param {boolean} applyCorrection Whether to add the key-mode delta.
+ * @returns {number} Effective valence ∈ [0, 1].
+ */
+function effectiveValence(track, applyCorrection) {
+  if (!applyCorrection || track.valence_key_correction == null) return track.valence;
+  return Math.max(0, Math.min(1, track.valence + track.valence_key_correction));
+}
+
+/**
  * mood_selector.js — greedy nearest-neighbor selection on the 2D mood plane
  *
  * Tracks are plotted at (valence, energy) ∈ [0,1]².
@@ -29,6 +41,21 @@ class MoodSelector {
     this._lastY = null;           // last cursor y (energy)
     this._sortedCandidates = [];  // tracks sorted by distance from last point
     this._playIndex = 0;          // index of next track to play in sorted list
+    this._applyKeyCorrection = true;
+  }
+
+  _eff(track) {
+    return effectiveValence(track, this._applyKeyCorrection);
+  }
+
+  /**
+   * Enable or disable the key-mode valence correction for distance sorting.
+   * Resets sort state so the next pickNext() re-sorts from scratch.
+   * @param {boolean} enabled
+   */
+  setKeyCorrection(enabled) {
+    this._applyKeyCorrection = enabled;
+    this._lastX = null;  // force re-sort on next pickNext()
   }
 
   /**
@@ -50,8 +77,8 @@ class MoodSelector {
     if (positionChanged) {
       // Re-sort all tracks by Euclidean distance to the new cursor position.
       this._sortedCandidates = [...this._tracks].sort((a, b) => {
-        const da = (a.valence - x) ** 2 + (a.energy - y) ** 2;
-        const db = (b.valence - x) ** 2 + (b.energy - y) ** 2;
+        const da = (this._eff(a) - x) ** 2 + (a.energy - y) ** 2;
+        const db = (this._eff(b) - x) ** 2 + (b.energy - y) ** 2;
         return da - db;
       });
       this._playIndex = 0;

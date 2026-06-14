@@ -14,6 +14,8 @@ import time
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials, SpotifyOAuth
 
+from src.data_manager import normalize_playlist_id
+
 
 class SpotifyClient:
     def __init__(
@@ -56,7 +58,7 @@ class SpotifyClient:
 
         Returns a list of dicts: track_id, uri, title, artist, album_art_url, duration_ms
         """
-        playlist_id = self._normalize_playlist_id(playlist_id)
+        playlist_id = normalize_playlist_id(playlist_id)
         tracks: list[dict] = []
 
         # GET /playlists/{id} embeds the first track page.
@@ -99,23 +101,13 @@ class SpotifyClient:
 
     def get_playlist_name(self, playlist_id: str) -> str:
         """Return the playlist's display name."""
-        playlist_id = self._normalize_playlist_id(playlist_id)
+        playlist_id = normalize_playlist_id(playlist_id)
         info = self._fetch_with_retry(self._sp.playlist, playlist_id, fields="name", market="from_token")
         return info.get("name", "")
 
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
-
-    @staticmethod
-    def _normalize_playlist_id(playlist_id: str) -> str:
-        """Accept a full URL, URI, or bare ID and return the bare ID."""
-        if "open.spotify.com/playlist/" in playlist_id:
-            playlist_id = playlist_id.split("open.spotify.com/playlist/")[1]
-            playlist_id = playlist_id.split("?")[0]
-        elif playlist_id.startswith("spotify:playlist:"):
-            playlist_id = playlist_id.split(":")[-1]
-        return playlist_id.strip()
 
     def _fetch_with_retry(self, fn, *args, max_retries: int = 5, **kwargs):
         """Call a Spotipy method and retry on 429 / transient errors."""
