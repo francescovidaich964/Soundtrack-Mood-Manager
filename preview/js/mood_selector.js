@@ -29,6 +29,24 @@ class MoodSelector {
     this._lastY = null;           // last cursor y (energy)
     this._sortedCandidates = [];  // tracks sorted by distance from last point
     this._playIndex = 0;          // index of next track to play in sorted list
+    this._applyKeyCorrection = true;
+  }
+
+  /** Returns effective valence for sorting: raw if correction is off and available. */
+  _eff(track) {
+    return (!this._applyKeyCorrection && Number.isFinite(track.valence_raw))
+      ? track.valence_raw
+      : track.valence;
+  }
+
+  /**
+   * Enable or disable the key-mode valence correction for distance sorting.
+   * Resets sort state so the next pickNext() re-sorts from scratch.
+   * @param {boolean} enabled
+   */
+  setKeyCorrection(enabled) {
+    this._applyKeyCorrection = enabled;
+    this._lastX = null;  // force re-sort on next pickNext()
   }
 
   /**
@@ -50,8 +68,8 @@ class MoodSelector {
     if (positionChanged) {
       // Re-sort all tracks by Euclidean distance to the new cursor position.
       this._sortedCandidates = [...this._tracks].sort((a, b) => {
-        const da = (a.valence - x) ** 2 + (a.energy - y) ** 2;
-        const db = (b.valence - x) ** 2 + (b.energy - y) ** 2;
+        const da = (this._eff(a) - x) ** 2 + (a.energy - y) ** 2;
+        const db = (this._eff(b) - x) ** 2 + (b.energy - y) ** 2;
         return da - db;
       });
       this._playIndex = 0;

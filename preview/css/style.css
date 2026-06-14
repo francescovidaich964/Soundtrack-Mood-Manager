@@ -1,5 +1,5 @@
 /* ================================================================
-   DnD Soundtrack Manager — dark fantasy theme
+   Soundtrack MoodPad
    Background: #0d0d1a  (deep navy-black)
    Accent:     #c9a84c  (old gold)
    Text:       #e8e0d0  (parchment)
@@ -214,10 +214,71 @@ button:active {
    ---------------------------------------------------------------- */
 
 .playlist-info {
-  font-size: 0.72rem;
-  color: rgba(232,224,208,0.3);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  color: rgba(232,224,208,0.35);
   letter-spacing: 0.06em;
   text-align: center;
+}
+
+.playlist-selector-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Playlist selector in footer */
+#playlist-select {
+  background: transparent;
+  color: inherit;
+  border: 1px solid rgba(201,168,76,0.35);
+  border-radius: 4px;
+  padding: 3px 8px;
+  font: inherit;
+  font-size: 0.88rem;
+  cursor: pointer;
+  max-width: 240px;
+}
+
+#playlist-select:focus {
+  outline: none;
+  border-color: rgba(201,168,76,0.7);
+}
+
+#playlist-select option {
+  background: #0d0d1a;
+}
+
+#playlist-track-count {
+  font-size: 0.82rem;
+  opacity: 0.6;
+  white-space: nowrap;
+}
+
+.key-correction-row {
+  font-size: 0.82rem;
+  color: rgba(232,224,208,0.45);
+}
+
+.key-correction-row label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+}
+
+.key-correction-row input[type="checkbox"] {
+  accent-color: #c9a84c;
+  cursor: pointer;
+}
+
+#playlist-id {
+  font-family: "Courier New", monospace;
+  font-size: 0.68rem;
+  opacity: 0.35;
+  letter-spacing: 0.04em;
 }
 
 /* ----------------------------------------------------------------

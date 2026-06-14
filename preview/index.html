@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>DnD Soundtrack</title>
+  <title>Soundtrack MoodPad</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -26,7 +26,7 @@
 
   <main class="app">
 
-    <h1>DnD Soundtrack</h1>
+    <h1>Soundtrack MoodPad</h1>
 
     <!-- ---- Mood Pad ---- -->
     <section class="mood-pad-wrapper" aria-label="Mood selector">
@@ -54,7 +54,19 @@
     </section>
 
     <!-- ---- Playlist info ---- -->
-    <footer class="playlist-info" id="playlist-info"></footer>
+    <footer class="playlist-info" id="playlist-info">
+      <div class="playlist-selector-row">
+        <select id="playlist-select" aria-label="Select playlist"></select>
+        <span id="playlist-track-count"></span>
+      </div>
+      <div class="key-correction-row">
+        <label>
+          <input type="checkbox" id="chk-key-correction" checked>
+          Key correction
+        </label>
+      </div>
+      <span id="playlist-id"></span>
+    </footer>
 
   </main>
 
@@ -87,6 +99,7 @@
        DOMContentLoaded is the correct way to wait for deferred scripts. -->
   <script>
     document.addEventListener('DOMContentLoaded', async () => {
+
       // ---- 0. Preview banner ----
       const _bi = window.BUILD_INFO;
       if (_bi && _bi.deployBranch !== 'main') {
@@ -95,34 +108,68 @@
           const _td = window.TRACK_DATA;
           const _syncBranch = _td?.sync_branch || null;
           const _syncDate   = _td?.generated_at ? _td.generated_at.slice(0, 10) : null;
-
           let _html = `webapp: <code>${_bi.deployBranch}</code>`;
           if (_syncBranch) _html += ` &nbsp;·&nbsp; data: <code>${_syncBranch}</code>`;
           if (_syncDate)   _html += ` &nbsp;·&nbsp; ${_syncDate}`;
-
           _banner.innerHTML = _html;
           _banner.hidden = false;
         }
       }
 
       // ---- 1. Auth ----
-      // May redirect to Spotify login and return via the PKCE callback.
-      // If redirecting, execution stops here for this page load.
       await Auth.init();
 
       // ---- 2. Check data ----
-      if (!window.TRACK_DATA || !window.TRACK_DATA.tracks?.length) {
+      const playlists = window.TRACK_DATA?.playlists;
+      const allTracks = window.TRACK_DATA?.tracks;
+
+      if (!playlists || Object.keys(playlists).length === 0) {
         // Overlay already visible — nothing more to do.
         return;
       }
 
-      const tracks = window.TRACK_DATA.tracks;
-      const playlistName = window.TRACK_DATA.playlist_name || "";
+      // ---- 3. Populate playlist selector ----
+      const selectEl = document.getElementById('playlist-select');
+      const countEl  = document.getElementById('playlist-track-count');
+      const idEl     = document.getElementById('playlist-id');
 
-      // ---- 3. Mood selector ----
-      const selector = new MoodSelector(tracks);
+      for (const [id, meta] of Object.entries(playlists)) {
+        const opt = document.createElement('option');
+        opt.value = id;
+        opt.textContent = meta.name;
+        selectEl.appendChild(opt);
+      }
 
-      if (selector.count === 0) {
+      // ---- 4. MoodSelector — mutable reference ----
+      let selector  = null;
+      let isPlaying = false;
+      let deviceId  = null;
+
+      function loadPlaylist(playlistId) {
+        const meta = playlists[playlistId];
+        if (!meta) return;
+
+        // Map ordered track_ids → full track objects; skip missing entries.
+        const playlistTracks = meta.track_ids
+          .map(tid => allTracks[tid])
+          .filter(Boolean);
+
+        selector = new MoodSelector(playlistTracks);
+
+        if (countEl) {
+          const n = selector.count;
+          countEl.textContent = `${n} track${n !== 1 ? 's' : ''}`;
+        }
+        if (idEl) idEl.textContent = playlistId;
+
+        UI.setTracks(selector);
+      }
+
+      // Load the first playlist immediately.
+      const firstPlaylistId = Object.keys(playlists)[0];
+      loadPlaylist(firstPlaylistId);
+
+      if (!selector || selector.count === 0) {
         UI.showError(
           "No analyzed tracks found in data.js.\n" +
           "Re-run the Sync Playlist workflow with force_reanalyze enabled."
@@ -130,23 +177,16 @@
         return;
       }
 
-      // ---- 4. UI ----
-      // Wire up cursor drag → point change (no auto-play on drag, just update state)
-      // Play/Pause and Next buttons handled here.
-      let isPlaying = false;
-      let deviceId  = null;
-
+      // ---- 5. UI init ----
       UI.init(
         selector,
-        /* onPointChanged */ (_x, _y) => {
-          // Point updated in UI internally; pickNext uses getCurrentPoint()
-        },
+        /* onPointChanged */ (_x, _y) => { /* cursor updated internally */ },
+
         /* onPlayPause */ async () => {
           if (!deviceId) return;
           const state = await Player.getCurrentState();
           if (!state) {
-            // Nothing loaded yet — pick the closest track and start playing.
-            const pt = UI.getCurrentPoint();
+            const pt    = UI.getCurrentPoint();
             const track = selector.pickNext(pt.x, pt.y);
             if (track) {
               await Player.setTrackVolume(track);
@@ -162,41 +202,50 @@
             isPlaying = false;
           }
         },
+
         /* onNext */ async () => {
           if (!deviceId) return;
-          const pt = UI.getCurrentPoint();
+          const pt    = UI.getCurrentPoint();
           const track = selector.pickNext(pt.x, pt.y);
           if (track) {
             await Player.setTrackVolume(track);
-            // Reset before the API call so the resulting state change
-            // (paused:true, position:0) is not misread as a natural track end.
             Player.resetPositionTracking();
             await SpotifyAPI.playTrack(deviceId, track.uri);
             isPlaying = true;
           }
         },
+
         /* onSeek */ async (positionMs) => {
           if (!deviceId) return;
           await SpotifyAPI.seekTo(positionMs);
         },
       );
 
-      // Playlist footer
-      const footer = document.getElementById("playlist-info");
-      if (footer && playlistName) {
-        footer.textContent =
-          `${playlistName} · ${selector.count} track${selector.count !== 1 ? "s" : ""}`;
-      }
+      // ---- 6. Playlist switcher ----
+      selectEl.addEventListener('change', async () => {
+        // Pause current playback before switching playlists.
+        const state = await Player.getCurrentState().catch(() => null);
+        if (state && !state.paused) {
+          await Player.pause();
+          isPlaying = false;
+        }
+        loadPlaylist(selectEl.value);
+        if (selector && selector.count === 0) {
+          UI.showError(
+            "No analyzed tracks found in this playlist.\n" +
+            "Re-run the Sync Playlist workflow with force_reanalyze enabled."
+          );
+        }
+      });
 
-      // ---- 5. Player SDK ----
+      // ---- 7. Player SDK ----
       Player.init(
         /* onTrackChanged */ state => {
           UI.onPlayerStateChanged(state);
           isPlaying = !state.paused;
         },
         /* onTrackEnded */ async () => {
-          // Auto-advance: pick the next track and play it.
-          const pt = UI.getCurrentPoint();
+          const pt    = UI.getCurrentPoint();
           const track = selector.pickNext(pt.x, pt.y);
           if (track && deviceId) {
             await Player.setTrackVolume(track);
@@ -206,7 +255,6 @@
         },
       );
 
-      // Wait for SDK ready → get device_id → transfer playback to this browser.
       deviceId = await Player.waitForReady();
     });
   </script>

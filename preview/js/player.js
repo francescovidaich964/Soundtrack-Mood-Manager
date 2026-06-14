@@ -1,7 +1,7 @@
 /**
  * player.js — Spotify Web Playback SDK setup
  *
- * Creates a "DnD Player" Spotify Connect device in the browser.
+ * Creates a "MoodPad" Spotify Connect device in the browser.
  * Handles SDK lifecycle events and drives the auto-advance logic.
  *
  * Important: window.onSpotifyWebPlaybackSDKReady must be defined BEFORE
@@ -35,7 +35,7 @@ const Player = (() => {
   // Compute a base volume so the quietest track in the playlist maps to 1.0,
   // ensuring no track ever needs to be clamped when boosted to target LUFS.
   // Falls back to 0.8 if no loudness data is available.
-  const _loudnessValues = (window.TRACK_DATA?.tracks ?? [])
+  const _loudnessValues = Object.values(window.TRACK_DATA?.tracks ?? {})
     .map(t => t.loudness_db)
     .filter(v => v != null);
   const _maxGain = Math.pow(10, (_TARGET_LUFS - Math.min(..._loudnessValues)) / 20);
@@ -92,7 +92,7 @@ const Player = (() => {
     _player.addListener("ready", async ({ device_id }) => {
       _deviceId = device_id;
       _isReady = true;
-      console.log("DnD Player ready, device_id:", device_id);
+      console.log("MoodPad ready, device_id:", device_id);
 
       // Make this browser the active Spotify Connect device.
       // Don't start playing yet (play=false) — wait for user input.
@@ -106,7 +106,7 @@ const Player = (() => {
     });
 
     _player.addListener("not_ready", ({ device_id }) => {
-      console.warn("DnD Player went offline:", device_id);
+      console.warn("MoodPad went offline:", device_id);
       _isReady = false;
     });
 
