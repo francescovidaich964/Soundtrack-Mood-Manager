@@ -7,6 +7,24 @@ It serves two purposes:
   2. Read back by sync.py as a cache to skip already-analyzed tracks.
 
 The JSON object inside is extracted with a regex so we never need a JS parser.
+
+Multi-playlist format (current):
+  {
+    "generated_at": "...",
+    "sync_branch":  "...",
+    "playlists": {
+      "<playlist_id>": {
+        "name": str, "synced_at": str, "sync_branch": str,
+        "track_ids": [str, ...]   # ordered list, preserves Spotify order
+      }
+    },
+    "tracks": {
+      "<track_id>": { track_id, uri, title, artist, album_art_url, duration_ms,
+                      [valence, energy, loudness_db, download_failed, analysis_failed] }
+    }
+  }
+
+Old single-playlist format (tracks as list) is automatically migrated on read.
 """
 
 from __future__ import annotations
@@ -28,103 +46,147 @@ window.TRACK_DATA = {json_body};
 """
 
 
-def read_data_js(path: Path) -> dict[str, dict]:
-    """Parse an existing data.js and return a dict keyed by track_id.
+# ---------------------------------------------------------------------------
+# Public helpers
+# ---------------------------------------------------------------------------
 
-    Returns an empty dict if the file does not exist or contains no valid data.
+def normalize_playlist_id(raw: str) -> str:
+    """Accept a full Spotify URL, URI, or bare ID and return the bare ID.
+
+    Raises ValueError if the URL points to a non-playlist resource (e.g. album).
+    """
+    raw = raw.strip()
+    # Catch common mistake of passing an album/track/artist URL
+    for kind in ("album", "track", "artist", "episode", "show"):
+        if f"open.spotify.com/{kind}/" in raw or raw.startswith(f"spotify:{kind}:"):
+            raise ValueError(
+                f"Expected a playlist URL or ID but got a Spotify {kind} link.\n"
+                f"Open the playlist in Spotify -> Share -> Copy link, and use that URL."
+            )
+    if "open.spotify.com/playlist/" in raw:
+        raw = raw.split("open.spotify.com/playlist/")[1]
+        raw = raw.split("?")[0]
+    elif raw.startswith("spotify:playlist:"):
+        raw = raw.split(":")[-1]
+    return raw
+
+
+# ---------------------------------------------------------------------------
+# Internal helpers
+# ---------------------------------------------------------------------------
+
+def _migrate_old_format(data: dict) -> dict:
+    """Convert the old single-playlist format (tracks as list) to multi-playlist."""
+    old_tracks_list = data["tracks"]
+    old_pid       = data.get("playlist_id", "unknown")
+    old_name      = data.get("playlist_name", "Imported Playlist")
+    old_synced_at = data.get("generated_at", "")
+    old_branch    = data.get("sync_branch", "")
+
+    tracks_dict = {}
+    track_ids   = []
+    for t in old_tracks_list:
+        if isinstance(t, dict) and "track_id" in t:
+            tracks_dict[t["track_id"]] = t
+            track_ids.append(t["track_id"])
+
+    playlists_dict = {
+        old_pid: {
+            "name":        old_name,
+            "synced_at":   old_synced_at,
+            "sync_branch": old_branch,
+            "track_ids":   track_ids,
+        }
+    }
+    return {"playlists": playlists_dict, "tracks": tracks_dict}
+
+
+def _parse_raw(raw: dict) -> dict:
+    """Normalize a raw parsed JSON dict to {"playlists": {...}, "tracks": {...}}."""
+    # Old single-playlist format: has "playlist_name" string + "tracks" list
+    if isinstance(raw.get("playlist_name"), str) and isinstance(raw.get("tracks"), list):
+        return _migrate_old_format(raw)
+
+    playlists = raw.get("playlists")
+    tracks    = raw.get("tracks")
+    if not isinstance(playlists, dict) or not isinstance(tracks, dict):
+        return {"playlists": {}, "tracks": {}}
+
+    return {"playlists": playlists, "tracks": tracks}
+
+
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
+
+def read_data_js(path: Path) -> dict:
+    """Parse data.js and return a normalized multi-playlist dict.
+
+    Returns {"playlists": {}, "tracks": {}} if the file is missing or invalid.
+    Automatically migrates the old single-playlist format.
     """
     if not path.exists():
-        return {}
+        return {"playlists": {}, "tracks": {}}
 
     content = path.read_text(encoding="utf-8")
     match = _DATA_RE.search(content)
     if not match:
-        return {}
+        return {"playlists": {}, "tracks": {}}
 
     try:
-        data = json.loads(match.group(1))
+        raw = json.loads(match.group(1))
     except json.JSONDecodeError:
-        return {}
+        return {"playlists": {}, "tracks": {}}
 
-    tracks = data.get("tracks")
-    if not isinstance(tracks, list):
-        return {}
-
-    return {t["track_id"]: t for t in tracks if isinstance(t, dict) and "track_id" in t}
+    return _parse_raw(raw)
 
 
-def write_data_js(
-    path: Path,
-    playlist_name: str,
-    playlist_id: str,
-    tracks: list[dict],
-    sync_branch: str = "",
-) -> str:
-    """Serialize the full track list and write data.js.
+def write_data_js(path: Path, data: dict, sync_branch: str = "") -> str:
+    """Serialize `data` (with "playlists" and "tracks" keys) and write data.js.
 
-    Args:
-        path: Destination path (e.g. webapp/data.js).
-        playlist_name: Human-readable playlist name.
-        playlist_id: Spotify playlist ID.
-        tracks: List of track dicts. Each must have at least 'track_id'.
-
-    Returns:
-        The generated_at ISO timestamp string.
+    Sets top-level "generated_at" and "sync_branch".
+    Returns the generated_at ISO timestamp string.
     """
     path.parent.mkdir(parents=True, exist_ok=True)
 
-    data: dict[str, Any] = {
-        "playlist_name": playlist_name,
-        "playlist_id": playlist_id,
-        "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "sync_branch": sync_branch,
-        "tracks": tracks,
+    generated_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    output: dict[str, Any] = {
+        "generated_at": generated_at,
+        "sync_branch":  sync_branch,
+        "playlists":    data.get("playlists", {}),
+        "tracks":       data.get("tracks", {}),
     }
 
-    json_body = json.dumps(data, indent=2, ensure_ascii=False)
-    content = _JS_TEMPLATE.format(
-        generated_at=data["generated_at"],
-        json_body=json_body,
-    )
+    json_body = json.dumps(output, indent=2, ensure_ascii=False)
+    content   = _JS_TEMPLATE.format(generated_at=generated_at, json_body=json_body)
     path.write_text(content, encoding="utf-8")
-    return data["generated_at"]
+    return generated_at
 
 
 def update_track(path: Path, track_id: str, fields: dict) -> None:
-    """Merge `fields` into the track with the given track_id in data.js.
+    """Merge `fields` into tracks[track_id] in data.js.
 
     Used for incremental saves: after each track is analyzed its valence/energy
     are written immediately so a mid-run interruption doesn't lose progress.
 
     If the file or the track does not exist, this is a no-op.
     """
-    cache = read_data_js(path)
-    if track_id not in cache:
+    if not path.exists():
         return
 
-    cache[track_id].update(fields)
-
-    # Re-read the full metadata (playlist_name, playlist_id) from the file
-    # so we can write it back intact.
     content = path.read_text(encoding="utf-8")
     match = _DATA_RE.search(content)
     if not match:
         return
 
     try:
-        data = json.loads(match.group(1))
+        raw = json.loads(match.group(1))
     except json.JSONDecodeError:
         return
 
-    # Replace the track list with the updated cache values.
-    # Preserve insertion order from the original list.
-    original_ids = [t.get("track_id") for t in data.get("tracks", [])]
-    data["tracks"] = [cache[tid] for tid in original_ids if tid in cache]
-    data["generated_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    data = _parse_raw(raw)
+    if track_id not in data["tracks"]:
+        return
 
-    json_body = json.dumps(data, indent=2, ensure_ascii=False)
-    new_content = _JS_TEMPLATE.format(
-        generated_at=data["generated_at"],
-        json_body=json_body,
-    )
-    path.write_text(new_content, encoding="utf-8")
+    data["tracks"][track_id].update(fields)
+    write_data_js(path, data, sync_branch=raw.get("sync_branch", ""))

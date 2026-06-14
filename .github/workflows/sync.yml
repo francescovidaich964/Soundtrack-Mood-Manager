@@ -4,8 +4,8 @@ on:
   workflow_dispatch:
     inputs:
       playlist:
-        description: "Spotify playlist URL or ID (overrides SPOTIFY_PLAYLIST_ID secret)"
-        required: false
+        description: "Spotify playlist URL or ID"
+        required: true
         type: string
       force_reanalyze:
         description: "Re-analyze all tracks even if cached"
@@ -111,7 +111,6 @@ jobs:
         run: |
           echo "SPOTIFY_CLIENT_ID set:     ${{ secrets.SPOTIFY_CLIENT_ID != '' }}"
           echo "SPOTIFY_CLIENT_SECRET set: ${{ secrets.SPOTIFY_CLIENT_SECRET != '' }}"
-          echo "SPOTIFY_PLAYLIST_ID set:   ${{ secrets.SPOTIFY_PLAYLIST_ID != '' }}"
           echo "SPOTIFY_REFRESH_TOKEN set: ${{ secrets.SPOTIFY_REFRESH_TOKEN != '' }}"
 
       # ------------------------------------------------------------------
@@ -119,18 +118,19 @@ jobs:
       # ------------------------------------------------------------------
       - name: Run sync
         env:
-          SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
+          SPOTIFY_CLIENT_ID:     ${{ secrets.SPOTIFY_CLIENT_ID }}
           SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
-          SPOTIFY_PLAYLIST_ID: ${{ inputs.playlist || secrets.SPOTIFY_PLAYLIST_ID }}
           SPOTIFY_REFRESH_TOKEN: ${{ secrets.SPOTIFY_REFRESH_TOKEN }}
-          GITHUB_PAGES_URL: ${{ steps.target.outputs.pages_url }}
-          GITHUB_REF_NAME: ${{ github.ref_name }}
+          GITHUB_PAGES_URL:      ${{ steps.target.outputs.pages_url }}
+          GITHUB_REF_NAME:       ${{ github.ref_name }}
+          PLAYLIST:              ${{ inputs.playlist }}
+          FORCE_REANALYZE:       ${{ inputs.force_reanalyze }}
         run: |
           EXTRA_FLAGS=""
-          if [ "${{ inputs.force_reanalyze }}" = "true" ]; then
+          if [ "$FORCE_REANALYZE" = "true" ]; then
             EXTRA_FLAGS="--force-reanalyze"
           fi
-          python sync.py $EXTRA_FLAGS
+          python sync.py --playlist "$PLAYLIST" $EXTRA_FLAGS
 
       # ------------------------------------------------------------------
       # Stamp webapp/js/build-info.js so the preview banner knows which
